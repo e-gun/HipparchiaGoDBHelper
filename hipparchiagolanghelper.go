@@ -54,7 +54,7 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "0.0.1"
+	version         = "0.0.2"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -218,7 +218,11 @@ func main() {
 
 	// DO NO comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer when GOLANGLOADING = 'cli'
 	// sharedlibraryclisearcher(): "resultrediskey = resultrediskey.split()[-1]"
-	fmt.Printf("%d %s have been stored at %s", t, x, o)
+	if t > -1 {
+		fmt.Printf("%d %s have been stored at %s", t, x, o)
+	} else {
+		fmt.Printf("%s have been stored at %s", x, o)
+	}
 }
 
 //
@@ -577,7 +581,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 
 	var mo map[string]DbMorphology
 	mo = getrequiredmorphobjects(keys, dbpool)
-	logiflogging(fmt.Sprintf("Got morphology [F: %fs]", time.Now().Sub(start).Seconds()), loglevel, 4)
+	logiflogging(fmt.Sprintf("Got morphology [F: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
 
 	//for k := range mo {
 	//	fmt.Println(fmt.Sprintf("%s", mo[k].Observed))
@@ -640,7 +644,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 		logiflogging(fmt.Sprintf("contents of bag[0]: %s", sentences[0].Sent), loglevel, 3)
 		logiflogging(fmt.Sprintf("contents of bag[1]: %s", sentences[1].Sent), loglevel, 3)
 	}
-
+	logiflogging(fmt.Sprintf("Reached result @ %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
 	return resultkey
 }
 
@@ -757,10 +761,8 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 	return bags
 }
 
-func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
-	// candidate for goroutines
-	// or should you do this with an unnest array query?
-	// cf wordbaggers.py: "SELECT headwords AS hw FROM unnest(ARRAY[{allwords}]) headwords"
+func looptogetrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
+	// the slow but sure way...
 
 	latintest := regexp.MustCompile(`[a-z]`)
 	qtemplate := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE observed_form = $1"
@@ -802,26 +804,28 @@ func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string
 	return foundmorph
 }
 
-func newgetrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
-	// better to use an array, but pgx is balking...
+func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
+	// better to use an array, but pgx is balking if you try to pass the array as $1 at dbpool.Exec()
+	// yet this seems perfectly // to fetchheadwordcounts()
 
 	// hipparchiaDB=# CREATE TEMPORARY TABLE ttw AS SELECT words AS w FROM unnest(ARRAY['dolor', 'amor', 'lusus']) words;
 	// hipparchiaDB=# SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM latin_morphology
 	//					WHERE EXISTS (SELECT 1 FROM ttw temptable WHERE temptable.w = latin_morphology.observed_form);
-	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[$1]) words"
+	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[%s]) words"
 	qt := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE EXISTS " +
 		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = %s_morphology.observed_form)"
 	rndid := strings.Replace(uuid.New().String(), "-", "", -1)
+	arr := strings.Join(wordlist, "', '")
+	arr = "'" + arr + "'"
+	tt = fmt.Sprintf(tt, rndid, arr)
 
-	arr := strings.Join(wordlist[0:10], ", ")
-	arr = strings.Join([]string{"nulli", "rogaberis", "amicum"}, ", ")
-
-	logiflogging(fmt.Sprintf(tt, rndid), 0, 0)
-	// logiflogging(fmt.Sprintf(arr), 0, 0)
-	_, err := dbpool.Exec(context.Background(), fmt.Sprintf(tt, rndid), arr)
+	_, err := dbpool.Exec(context.Background(), tt)
 	checkerror(err)
+
+	// need to insert a filter to grab all latin and then all greek...
+
 	uselang := "latin"
-	logiflogging(fmt.Sprintf(qt, uselang, rndid, uselang), 0, 0)
+
 	foundrows, e := dbpool.Query(context.Background(), fmt.Sprintf(qt, uselang, rndid, uselang))
 	checkerror(e)
 
@@ -830,7 +834,6 @@ func newgetrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[str
 	count := 0
 	for foundrows.Next() {
 		count += 1
-		logiflogging(fmt.Sprintf("hit : %d", count), 0, 0)
 		var thehit DbMorphology
 		err = foundrows.Scan(&thehit.Observed, &thehit.Xrefs, &thehit.PefixXrefs, &thehit.RawPossib)
 		checkerror(err)
