@@ -54,7 +54,7 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "0.0.2"
+	version         = "0.0.3"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -805,6 +805,35 @@ func looptogetrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[
 }
 
 func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
+	// run arraytogetrequiredmorphobjects once for each language
+	latintest := regexp.MustCompile(`[a-z]`)
+	var latinwords []string
+	var greekwords []string
+	for i := 0; i < len(wordlist); i++ {
+		if latintest.MatchString(wordlist[i]) {
+			latinwords = append(latinwords, wordlist[i])
+		} else {
+			greekwords = append(greekwords, wordlist[i])
+		}
+	}
+
+	lt := arraytogetrequiredmorphobjects(latinwords, "latin", dbpool)
+	gk := arraytogetrequiredmorphobjects(greekwords, "greek", dbpool)
+
+	mo := make(map[string]DbMorphology)
+	for k, v := range gk {
+		mo[k] = v
+	}
+
+	for k, v := range lt {
+		mo[k] = v
+	}
+
+	logiflogging(fmt.Sprintf("foundmorph contains %d members", len(mo)), 0, 0)
+	return mo
+}
+
+func arraytogetrequiredmorphobjects(wordlist []string, uselang string, dbpool *pgxpool.Pool) map[string]DbMorphology {
 	// better to use an array, but pgx is balking if you try to pass the array as $1 at dbpool.Exec()
 	// yet this seems perfectly // to fetchheadwordcounts()
 
@@ -822,10 +851,6 @@ func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string
 	_, err := dbpool.Exec(context.Background(), tt)
 	checkerror(err)
 
-	// need to insert a filter to grab all latin and then all greek...
-
-	uselang := "latin"
-
 	foundrows, e := dbpool.Query(context.Background(), fmt.Sprintf(qt, uselang, rndid, uselang))
 	checkerror(e)
 
@@ -839,11 +864,9 @@ func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string
 		checkerror(err)
 		thehit.UniqPossib = make(map[string]bool)
 		if _, t := foundmorph[thehit.Observed]; t {
-			// logiflogging(fmt.Sprintf("%s is already present; need to append these possibilites to the other possibilities", thehit.Observed), 0, 0)
 			newpos := updatesetofpossibilities(thehit.RawPossib, thehit.UniqPossib)
 			for p := range newpos {
 				if _, t := foundmorph[thehit.Observed].UniqPossib[p]; !t {
-					// logiflogging(fmt.Sprintf("appending to %s: %s", thehit.Observed, p), 0, 0)
 					foundmorph[thehit.Observed].UniqPossib[p] = true
 				}
 			}
@@ -852,10 +875,6 @@ func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string
 			foundmorph[thehit.Observed] = thehit
 		}
 	}
-
-	// latintest := regexp.MustCompile(`[a-z]`)
-
-	logiflogging(fmt.Sprintf("foundmorph contains %d members", len(foundmorph)), 0, 0)
 
 	return foundmorph
 }
