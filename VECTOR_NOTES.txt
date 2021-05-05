@@ -1,0 +1,40 @@
+Optimization candidates
+
+e-gun/HipparchiaGoVectorHelper/ % date && ./HipparchiaGoVectorHelper -xb lt0474 -xe 140000 && date
+Wed May  5 11:18:14 EDT 2021
+[GVM] Hipparchia GoVectorMorphology CLI Debugging Interface (v.0.1.0) [loglevel=4]
+[GVM] Seeking to build *winnertakesall* bags of words
+[GVM] Connected to redis
+[GVM] Connected to hipparchiaDB on PostgreSQL
+[GVM] No redis key; gathering lines with a direct PostgreSQL query%!(EXTRA string=hipparchiaDB)
+[GVM] working with 140000 lines [A: 0.263561s]
+[GVM] [B: 125.064382s])
+[GVM] [C: 125.150916s])
+[GVM] found 53873 sentences [D: 126.021976s]
+[GVM] found 79975 distinct words [E: 126.085734s]
+[GVM] foundmorph contains 65693)
+[GVM] Got morphology [F: %!f(int=53873)s]%!(EXTRA float64=137.373047726)
+[GVM] contents of bag[0]: pro¹
+[GVM] contents of bag[1]: oratio quis¹ res in duo plurimus possum is contra nos ambo facio in hic tempus summa gratia et eloquor quis² alter
+53873 winnertakesall bags of words stored at _vectorresults
+Wed May  5 11:20:39 EDT 2021
+
+
+
+Wed May  5 11:45:30 EDT 2021
+[GVM] Hipparchia GoVectorMorphology CLI Debugging Interface (v.0.1.0) [loglevel=4]
+[GVM] Seeking to build *winnertakesall* bags of words
+[GVM] Connected to redis
+[GVM] Connected to hipparchiaDB on PostgreSQL
+[GVM] No redis key; gathering lines with a direct PostgreSQL query%!(EXTRA string=hipparchiaDB)
+[GVM] working with 140000 lines [A: 0.210316s]
+[GVM] unified text block built [B: 0.308553s])
+[GVM] preliminary cleanups complete [C: 0.414944s])
+[GVM] found 53873 sentences [D: 1.255209s]
+[GVM] found 79975 distinct words [E: 1.312980s]
+[GVM] foundmorph contains 65693)
+[GVM] Got morphology [F: 10.390874s]
+[GVM] contents of bag[0]: pro¹
+[GVM] contents of bag[1]: oratio qui¹ reor in duo multus possum elicio contra nos ambo facio in huc tempus summum gratia et eloquens qui² alter
+53873 winnertakesall bags of words stored at _vectorresults
+Wed May  5 11:45:48 EDT 2021

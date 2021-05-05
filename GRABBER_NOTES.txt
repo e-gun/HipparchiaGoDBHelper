@@ -1,0 +1,77 @@
+#
+# getting ready for gopy, etc.
+#
+# "(This all assumes you have already installed Go itself, and added ~/go/bin to your PATH)."
+
+# $GOPATH/src/github.com/e-gun/HipparchiaGoGrabberModule
+
+pip install pybindgen
+go mod init github.com/e-gun/e-gun/HipparchiaGoGrabberModule
+go mod tidy
+go get github.com/go-python/gopy/gopyh
+go get golang.org/x/tools/cmd/goimports
+go get github.com/go-python/gopy
+rm -rf ./golangmodule/ && gopy build -output=golangmodule -vm=`which python3` $GOPATH/src/github.com/e-gun/HipparchiaGoGrabberModule/
+
+
+#
+# interacting with the module as a module
+#
+
+import hipparchiagolangsearching as gs
+r = gs.NewRedisLogin('localhost:6379', '', 0)
+p = gs.NewPostgresLogin('localhost', 5432, 'hippa_rd', 'MYPASSWORD', 'hipparchiaDB')
+s = gs.HipparchiaGolangSearcher
+s('x', 200, 5, 3, r, p)
+
+output: [not up to date, but indicative...]
+    grabber #2 found work
+    'x_results'
+
+then check redis-cli:
+    127.0.0.1:6379> smembers x_results
+
+#
+# setting up data for python cli testing of the golang module
+#
+
+import redis
+import json
+rc = redis.ConnectionPool(host='127.0.0.1', port=6379, db=0)
+c = redis.Redis(connection_pool=rc)
+l = {'TempTable': '', 'PsqlQuery': 'SELECT wkuniversalid, index, level_05_value, level_04_value, level_03_value, level_02_value, level_01_value, level_00_value, marked_up_line, accented_line, stripped_line, hyphenated_words, annotations FROM lt0914 WHERE  ( stripped_line ~* $1 )  LIMIT 200', 'PsqlData': '(^|\\s)strage(\\s|$)'}
+c.sadd('x', json.dumps(l))
+
+#
+# testing the websocket server function
+#
+
+PYTHON:
+
+import hipparchiagolangsearching as gs
+r = gs.NewRedisLogin('localhost:6379', '', 0)
+gs.StartHipparchiaPollWebsocket(5005, 2, 5, r)
+
+
+JSCONSOLE:
+let cc = new WebSocket('ws://localhost:5005/');
+cc.onmessage = function (msg) { console.log(msg.data) };
+cc.send('2f81c630');
+
+#
+# misc URLS
+#
+
+https://tutorialedge.net/golang/go-redis-tutorial/
+https://golangdocs.com/golang-postgresql-example
+https://gobyexample.com/waitgroups
+https://github.com/go-python/gopy
+https://github.com/olahol/melody
+
+#
+# python + go FYI
+#
+
+https://www.ardanlabs.com/blog/2020/07/extending-python-with-go.html
+https://hackernoon.com/extending-python-3-in-go-78f3a69552ac
+https://blog.filippo.io/building-python-modules-with-go-1-5/
