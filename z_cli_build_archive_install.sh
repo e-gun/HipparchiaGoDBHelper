@@ -3,7 +3,7 @@
 # don't use this for the module: that requires the 'postmodulebuild' scripts
 
 # toggle build style if needed
-gsed -i "s/package hipparchiagolangsearching/package main/" hipparchiagolanghelper.go
+gsed -i "s/package hipparchiagolangsearching/package main/" *.go
 
 go build
 O="HipparchiaGoDBHelper"

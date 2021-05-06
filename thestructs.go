@@ -1,0 +1,83 @@
+//    HipparchiaGoDBHelper: search and vector helper app and functions for HipparchiaServer
+//    Copyright: E Gunderson 2016-21
+//    License: GNU GENERAL PUBLIC LICENSE 3
+//        (see LICENSE in the top level directory of the distribution)
+
+package main
+
+type PrerolledQuery struct {
+	TempTable string
+	PsqlQuery string
+	PsqlData  string
+}
+
+type DbWorkline struct {
+	WkUID       string
+	TbIndex     int
+	Lvl5Value   string
+	Lvl4Value   string
+	Lvl3Value   string
+	Lvl2Value   string
+	Lvl1Value   string
+	Lvl0Value   string
+	MarkedUp    string
+	Accented    string
+	Stripped    string
+	Hypenated   string
+	Annotations string
+}
+
+type RedisLogin struct {
+	Addr     string
+	Password string
+	DB       int
+}
+
+type PostgresLogin struct {
+	Host   string
+	Port   int
+	User   string
+	Pass   string
+	DBName string
+}
+
+// https://golangbyexample.com/sort-custom-struct-collection-golang/
+type WeightedHeadword struct {
+	Word  string
+	Count int
+}
+
+type WHWList []WeightedHeadword
+
+func (w WHWList) Len() int {
+	return len(w)
+}
+
+func (w WHWList) Less(i, j int) bool {
+	return w[i].Count > w[j].Count
+}
+
+func (w WHWList) Swap(i, j int) {
+	w[i], w[j] = w[j], w[i]
+}
+
+type SentenceWithLocus struct {
+	Loc  string
+	Sent string
+}
+
+type DbMorphology struct {
+	Observed   string
+	Xrefs      string
+	PefixXrefs string
+	RawPossib  string
+	UniqPossib map[string]bool
+}
+
+type MorphPossibility struct {
+	Observed string
+	Number   string
+	Entry    string
+	Xref     string
+	TrAnal   string
+}

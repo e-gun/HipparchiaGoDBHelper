@@ -5,7 +5,7 @@ A="../HipparchiaGoBinaries/gohelper/module"
 H="${HOME}/hipparchia_venv/HipparchiaServer/server/golangmodule/"
 
 # toggle build style if needed
-gsed -i "s/package main/package hipparchiagolangsearching/" hipparchiagolanghelper.go
+gsed -i "s/package main/package hipparchiagolangsearching/" *.go
 
 gopy build -output=golangmodule -vm=`which python3` $GOPATH/src/github.com/e-gun/HipparchiaGoDBHelper/
 
