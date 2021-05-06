@@ -1,9 +1,9 @@
-//    HipparchiaGoGrabberModule: search helper app and functions for HipparchiaServer
+//    HipparchiaGoDBHelper: search and vector helper app and functions for HipparchiaServer
 //    Copyright: E Gunderson 2016-21
 //    License: GNU GENERAL PUBLIC LICENSE 3
 //        (see LICENSE in the top level directory of the distribution)
 
-// HipparchiaGoVectorHelper and HipparchiaGoGrabberModule needed to converge:
+// HipparchiaGoVectorHelper and HipparchiaGoGrabberModule have been made to converge:
 // the vector code needed to be able to search
 //
 // the GRABBER is supposed to be pointedly basic
@@ -54,7 +54,7 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "0.0.3"
+	version         = "0.0.4"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -216,7 +216,7 @@ func main() {
 		t = -1
 	}
 
-	// DO NO comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer when GOLANGLOADING = 'cli'
+	// DO NOT comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer when GOLANGLOADING = 'cli'
 	// sharedlibraryclisearcher(): "resultrediskey = resultrediskey.split()[-1]"
 	if t > -1 {
 		fmt.Printf("%d %s have been stored at %s", t, x, o)
@@ -466,6 +466,10 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 			}
 		}
 	}
+
+	// turn of progress logging
+	redisclient.Set(searchkey+"_poolofwork", -1, redisexpiration)
+	redisclient.Set(searchkey+"_hitcount", 0, redisexpiration)
 
 	// [b] turn them into a unified text block
 
