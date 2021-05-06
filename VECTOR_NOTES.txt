@@ -54,3 +54,20 @@ Wed May  5 16:25:18 EDT 2021
 [HGH] Reached result @ 10.358161s]
 bags have been stored at _vectorresultsWed May  5 16:25:29 EDT 2021
 
+
+retest of cicero via unnest array morphology AND recursive split of the text
+
+date && ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" && date
+Thu May  6 12:52:29 EDT 2021
+[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.0.0.4) [loglevel=3]
+[HGH] Seeking to build *winnertakesall* bags of words
+[HGH] Connected to redis
+[HGH] Connected to hipparchiaDB on PostgreSQL
+[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query%!(EXTRA string=hipparchiaDB)
+[HGH] found 79683 sentences [D: 1.590132s]
+[HGH] foundmorph contains 65693 members
+[HGH] Got morphology [F: 3.167224s]
+[HGH] contents of bag[0]:
+[HGH] contents of bag[1]: qui¹ alter
+[HGH] Reached result @ 13.265072s]
+bags have been stored at _vectorresultsThu May  6 12:52:42 EDT 2021

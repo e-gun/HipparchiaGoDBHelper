@@ -54,7 +54,7 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "0.0.4"
+	version         = "0.1.0"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -500,15 +500,12 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 
 	// [d] break the text into sentences and assemble []SentenceWithLocus
 
-	// TODO: split at more than just one kind of punctuation...
-	// terminations := []string{".", "?", "!", "·", ";"}
-	//for i := 0; i < len(terminations); i++ {
-	//	s := strings.Split(txt, terminations[i])
-	//
-	//}
-	// https://github.com/golang/go/wiki/SliceTricks
+	// split at more than just one kind of punctuation...
+	terminations := []string{".", "?", "!", "·", ";"}
+	s := recursivesplitter([]string{txt}, terminations, 0, len(terminations))
 
-	s := strings.Split(txt, ".")
+	// the vanilla version...
+	// s := strings.Split(txt, ".")
 
 	var sentences []SentenceWithLocus
 	var first string
@@ -648,7 +645,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 		logiflogging(fmt.Sprintf("contents of bag[0]: %s", sentences[0].Sent), loglevel, 3)
 		logiflogging(fmt.Sprintf("contents of bag[1]: %s", sentences[1].Sent), loglevel, 3)
 	}
-	logiflogging(fmt.Sprintf("Reached result @ %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
+	logiflogging(fmt.Sprintf("Reached result @ %fs]", time.Now().Sub(start).Seconds()), loglevel, 1)
 	return resultkey
 }
 
@@ -962,6 +959,35 @@ func fetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[
 		returnmap[thehit.Word] = thehit.Count
 	}
 	return returnmap
+}
+
+func recursivesplitter(ss []string, tt []string, c int, e int) []string {
+	for {
+		c += 1
+		var rr []string
+		var t string
+
+		if len(tt) > 1 {
+			t = tt[0]
+			tt = tt[1:]
+		} else {
+			t = tt[0]
+		}
+
+		for i := 0; i < len(ss); i++ {
+			rr = append(rr, strings.Split(ss[i], t)...)
+		}
+
+		//for i := 0; i < len(rr); i++ {
+		//	fmt.Printf(fmt.Sprintf("%d.%d: %s\n", c, i, rr[i]))
+		//}
+
+		if c < e {
+			return recursivesplitter(rr, tt, c, e)
+		} else {
+			return rr
+		}
+	}
 }
 
 //
