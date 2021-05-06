@@ -1,3 +1,37 @@
+
+interacting with the module
+
+// func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, thedb string, thestart int, theend int, loglevel int, r RedisLogin, p PostgresLogin) string
+
+pip install pybindgen
+go mod init github.com/e-gun/e-gun/HipparchiaGoGrabberModule
+go mod tidy
+go get github.com/go-python/gopy/gopyh
+go get golang.org/x/tools/cmd/goimports
+go get github.com/go-python/gopy
+gsed -i "s/package main/package hipparchiagolangsearching/" *.go
+rm -rf ./golangmodule/ && gopy build -output=golangmodule -vm=`which python3` $GOPATH/src/github.com/e-gun/HipparchiaGoDBHelper/
+
+import hipparchiagolangsearching as gs
+r = gs.NewRedisLogin('localhost:6379', '', 0)
+p = gs.NewPostgresLogin('localhost', 5432, 'hippa_rd', 'MYPASSWORD', 'hipparchiaDB')
+b = gs.HipparchiaBagger
+b('x', 'winnertakesall', 5, 'lt0448', 1, 26, 3, r, p)
+
+
+output:
+
+>>> b('x', 'winnertakesall', 5, 'lt0448', 1, 26, 3, r, p)
+[HGH] Seeking to build *winnertakesall* bags of words
+[HGH] Connected to redis
+[HGH] Connected to hipparchiaDB on PostgreSQL
+[HGH] found 1 sentences [D: 0.012686s]
+[HGH] foundmorph contains 0 members
+[HGH] Got morphology [F: 0.023864s]
+[HGH] Reached result @ 0.028933s]
+'x_vectorresults'
+
+
 Optimization candidates
 
 e-gun/HipparchiaGoVectorHelper/ % date && ./HipparchiaGoVectorHelper -xb lt0474 -xe 140000 && date

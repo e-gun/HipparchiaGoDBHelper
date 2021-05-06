@@ -11,6 +11,7 @@ go mod tidy
 go get github.com/go-python/gopy/gopyh
 go get golang.org/x/tools/cmd/goimports
 go get github.com/go-python/gopy
+gsed -i "s/package main/package hipparchiagolangsearching/" *.go
 rm -rf ./golangmodule/ && gopy build -output=golangmodule -vm=`which python3` $GOPATH/src/github.com/e-gun/HipparchiaGoDBHelper/
 
 #
