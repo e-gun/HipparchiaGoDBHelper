@@ -311,16 +311,20 @@ func loadthebags(resultkey string, goroutines int, sentences []SentenceWithLocus
 	leftover := totalwork % goroutines
 	bagsofbags := make(map[int][]SentenceWithLocus, goroutines)
 
-	thestart := 0
-	for i := 0; i < goroutines; i++ {
-		bagsofbags[i] = sentences[thestart : thestart+chunksize]
-		thestart = thestart + chunksize
-	}
-	// leave no sentence behind!
-	if leftover > 0 {
-		bagsofbags[goroutines-1] = append(bagsofbags[goroutines-1], sentences[totalwork-leftover-1:totalwork-1]...)
-	}
+	if totalwork <= goroutines {
+		bagsofbags[0] = sentences
+	} else {
+		thestart := 0
+		for i := 0; i < goroutines; i++ {
+			bagsofbags[i] = sentences[thestart : thestart+chunksize]
+			thestart = thestart + chunksize
+		}
 
+		// leave no sentence behind!
+		if leftover > 0 {
+			bagsofbags[goroutines-1] = append(bagsofbags[goroutines-1], sentences[totalwork-leftover-1:totalwork-1]...)
+		}
+	}
 	var wg sync.WaitGroup
 	for i := 0; i < goroutines; i++ {
 		wg.Add(1)
