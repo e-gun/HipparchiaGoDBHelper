@@ -30,11 +30,14 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
 //HipparchiaBagger: Take a key; grab lines; bag them; store them
-func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, thedb string, thestart int, theend int, loglevel int, r RedisLogin, p PostgresLogin) string {
+func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, thedb string, thestart int, theend int,
+	loglevel int, r RedisLogin, p PostgresLogin) string {
+
 	start := time.Now()
 	logiflogging(fmt.Sprintf("Seeking to build *%s* bags of words", baggingmethod), loglevel, 2)
 
@@ -43,6 +46,10 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	checkerror(err)
 	defer redisclient.Close()
 	logiflogging(fmt.Sprintf("Connected to redis"), loglevel, 2)
+
+	// turn of progress logging
+	redisclient.Set(searchkey+"_poolofwork", -1, redisexpiration)
+	redisclient.Set(searchkey+"_hitcount", 0, redisexpiration)
 
 	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", p.User, p.Pass, p.Host, p.Port, p.DBName)
 	dbpool, err := pgxpool.Connect(context.Background(), url)
@@ -55,9 +62,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	logiflogging(fmt.Sprintf("Connected to %s on PostgreSQL", p.DBName), loglevel, 2)
 
 	// [a] grab the db lines
-	// we should really be pulling these out of redis...
-
-	// we do this by copying the code inside of grabber but just cut out the storage bits
+	// we do this by copying the code inside of grabber but just cut out the storage bits: not DRY, but...
 	remain, err := redisclient.SCard(searchkey).Result()
 	checkerror(err)
 	redisclient.Set(searchkey+"_poolofwork", remain, redisexpiration)
@@ -80,21 +85,18 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 			checkerror(err)
 			logiflogging(fmt.Sprintf("bagger says that %d locations still need grabbing", remain), loglevel, 3)
 
-			// [ii] update the polling data
-			redisclient.Set(searchkey+"_remaining", remain, redisexpiration)
-
-			// [iii] decode the query
+			// [ii] decode the query
 			var prq PrerolledQuery
 			err = json.Unmarshal([]byte(byteArray), &prq)
 			checkerror(err)
 
-			// [iv] build a temp table if needed
+			// [iii] build a temp table if needed
 			if prq.TempTable != "" {
 				_, err := dbpool.Exec(context.Background(), prq.TempTable)
 				checkerror(err)
 			}
 
-			// [v] execute the main query
+			// [iv] execute the main query
 			var foundrows pgx.Rows
 			logiflogging(fmt.Sprintf("bagger will ask: %s", prq.PsqlQuery), loglevel, 5)
 			if prq.PsqlData != "" {
@@ -105,7 +107,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 				checkerror(err)
 			}
 
-			// [vi] iterate through the finds
+			// [v] iterate through the finds
 			defer foundrows.Close()
 			for foundrows.Next() {
 				count += 1
@@ -119,10 +121,6 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 			}
 		}
 	}
-
-	// turn of progress logging
-	redisclient.Set(searchkey+"_poolofwork", -1, redisexpiration)
-	redisclient.Set(searchkey+"_hitcount", 0, redisexpiration)
 
 	// [b] turn them into a unified text block
 
@@ -186,7 +184,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 
 	logiflogging(fmt.Sprintf("found %d sentences [D: %fs]", len(sentences), time.Now().Sub(start).Seconds()), loglevel, 2)
 
-	// unlemmatized bags of words customers are in fact done right now
+	// unlemmatized bags of words customers have in fact reached their target as of now
 	if baggingmethod == "unlemmatized" {
 		resultkey := storebagsofwords(searchkey, sentences, redisclient)
 		// DO NO comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer
@@ -213,8 +211,6 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 			allwords[ww[j]] = true
 		}
 	}
-
-	logiflogging(fmt.Sprintf("found %d distinct words [E: %fs]", len(allwords), time.Now().Sub(start).Seconds()), loglevel, 4)
 
 	logiflogging(fmt.Sprintf("found %d distinct words [E: %fs]", len(allwords), time.Now().Sub(start).Seconds()), loglevel, 4)
 
@@ -268,6 +264,8 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 		}
 	}
 
+	logiflogging(fmt.Sprintf("Build morphdict [F1: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
+
 	// no need for the "bool" any longer; demap things
 	flatdict := make(map[string][]string, len(morphdict))
 	for i := range morphdict {
@@ -281,7 +279,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	//for q := range flatdict {
 	//	fmt.Println(fmt.Sprintf("%s:\n\t%s", q, flatdict[q]))
 	//}
-
+	logiflogging(fmt.Sprintf("Pre-Bagging [F2: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
 	switch baggingmethod {
 	case "flat":
 		sentences = buildflatbagsofwords(sentences, flatdict)
@@ -290,14 +288,63 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	case "winnertakesall":
 		sentences = buildwinnertakesallbagsofwords(sentences, flatdict, dbpool)
 	default:
-		logiflogging(fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", baggingmethod), loglevel, 2)
+		logiflogging(fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", baggingmethod), loglevel, 0)
+	}
+	logiflogging(fmt.Sprintf("Post-Bagging [F3: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
+
+	bags := 5
+	work := len(sentences)
+	chunksize := work / bags
+	// leftover := work % bags
+	bagsofbags := make(map[int][]SentenceWithLocus, bags)
+
+	thestart = 0
+	for i := 0; i < bags; i++ {
+		fmt.Println(fmt.Sprintf("(%d) sentences[%d : %d]", i, thestart, thestart+chunksize))
+		bagsofbags[i] = sentences[thestart : thestart+chunksize]
+		thestart = thestart + chunksize
 	}
 
-	resultkey := storebagsofwords(searchkey, sentences, redisclient)
-	if len(sentences) > 1 {
-		logiflogging(fmt.Sprintf("contents of bag[0]: %s", sentences[0].Sent), loglevel, 3)
-		logiflogging(fmt.Sprintf("contents of bag[1]: %s", sentences[1].Sent), loglevel, 3)
+	// bagsofbags[bags-1] = append(bagsofbags[bags-1], sentences[work-leftover:work]...)
+
+	var resultkey string
+	kk := strings.Split(searchkey, "_")
+	resultkey = kk[0] + "_vectorresults"
+
+	var wg sync.WaitGroup
+
+	//loader := func (searchkey string, resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
+	//	for i := 0; i < len(bags); i++ {
+	//		jsonhit, err := json.Marshal(bags[i])
+	//		checkerror(err)
+	//		redisclient.SAdd(resultkey, jsonhit)
+	//	}
+	//	// ch <- resultkey
+	//	wg.Done()
+	//}
+
+	for i := 0; i < bags; i++ {
+		wg.Add(1)
+		go parallelloader(searchkey, resultkey, bagsofbags[i], redisclient, &wg)
 	}
+
+	wg.Wait()
+
+	//resultkey := storebagsofwords(searchkey, sentences, redisclient)
+	//if len(sentences) > 1 {
+	//	logiflogging(fmt.Sprintf("contents of bag[0]: %s", sentences[0].Sent), loglevel, 3)
+	//	logiflogging(fmt.Sprintf("contents of bag[1]: %s", sentences[1].Sent), loglevel, 3)
+	//}
 	logiflogging(fmt.Sprintf("Reached result @ %fs]", time.Now().Sub(start).Seconds()), loglevel, 1)
 	return resultkey
+}
+
+func parallelloader(searchkey string, resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
+	for i := 0; i < len(bags); i++ {
+		jsonhit, err := json.Marshal(bags[i])
+		checkerror(err)
+		redisclient.SAdd(resultkey, jsonhit)
+	}
+	// ch <- resultkey
+	wg.Done()
 }

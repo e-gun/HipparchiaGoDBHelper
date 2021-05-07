@@ -24,9 +24,25 @@ p = gs.NewPostgresLogin('localhost', 5432, 'hippa_rd', 'MYPASSWORD', 'hipparchia
 s = gs.HipparchiaGolangSearcher
 s('x', 200, 5, 3, r, p)
 
-output: [not up to date, but indicative...]
-    grabber #2 found work
-    'x_results'
+>>> s('x', 200, 5, 3, r, p)
+[HGH] recordinitialsizeofworkpile(): initial size of workpile for 'x_poolofwork' is 0
+[HGH] Hello from grabber 4
+[HGH] Hello from grabber 1
+[HGH] Hello from grabber 3
+[HGH] Hello from grabber 0
+[HGH] Hello from grabber 2
+[HGH] grabber #4 connected to redis
+[HGH] grabber #2 connected to redis
+[HGH] grabber #1 connected to redis
+[HGH] grabber #0 connected to redis
+[HGH] grabber #3 connected to redis
+[HGH] grabber #3 Connected to hipparchiaDB on PostgreSQL
+[HGH] grabber #2 Connected to hipparchiaDB on PostgreSQL
+[HGH] grabber #1 Connected to hipparchiaDB on PostgreSQL
+[HGH] grabber #4 Connected to hipparchiaDB on PostgreSQL
+[HGH] grabber #0 Connected to hipparchiaDB on PostgreSQL
+'x_results'
+
 
 then check redis-cli:
     127.0.0.1:6379> smembers x_results

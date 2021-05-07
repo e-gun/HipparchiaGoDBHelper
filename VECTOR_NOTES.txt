@@ -34,74 +34,86 @@ output:
 
 Optimization candidates
 
-e-gun/HipparchiaGoVectorHelper/ % date && ./HipparchiaGoVectorHelper -xb lt0474 -xe 140000 && date
-Wed May  5 11:18:14 EDT 2021
-[GVM] Hipparchia GoVectorMorphology CLI Debugging Interface (v.0.1.0) [loglevel=4]
-[GVM] Seeking to build *winnertakesall* bags of words
-[GVM] Connected to redis
-[GVM] Connected to hipparchiaDB on PostgreSQL
-[GVM] No redis key; gathering lines with a direct PostgreSQL query%!(EXTRA string=hipparchiaDB)
-[GVM] working with 140000 lines [A: 0.263561s]
-[GVM] [B: 125.064382s])
-[GVM] [C: 125.150916s])
-[GVM] found 53873 sentences [D: 126.021976s]
-[GVM] found 79975 distinct words [E: 126.085734s]
-[GVM] foundmorph contains 65693)
-[GVM] Got morphology [F: %!f(int=53873)s]%!(EXTRA float64=137.373047726)
-[GVM] contents of bag[0]: pro¹
-[GVM] contents of bag[1]: oratio quis¹ res in duo plurimus possum is contra nos ambo facio in hic tempus summa gratia et eloquor quis² alter
-53873 winnertakesall bags of words stored at _vectorresults
-Wed May  5 11:20:39 EDT 2021
+it would be nice to build the word2vec model inside of go; then it could just be stored...
+this would save to hand-off time (which can be substantial on a full corpus), but it might be slower than python's optimized C?
+
+Word Embeddings in Go:
+    https://github.com/ynqa/wego
+
+see the speed notes at https://github.com/mklf/word2vec-rs : rust is definitely slower...
+
+so you would need to call a C version of word2vec from go:
+
+    https://karthikkaranth.me/blog/calling-c-code-from-go/
 
 
 
-cicero via loop to get morphology:
-1342 •erik@big-sur-box• e-gun/HipparchiaGoDBHelper/ % date && ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" && date
-Wed May  5 16:27:26 EDT 2021
-[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.0.0.2) [loglevel=3]
+e-gun/HipparchiaGoDBHelper/ %  date && ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" && date
+Fri May  7 15:05:07 EDT 2021
+[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.0.1.5) [loglevel=3]
 [HGH] Seeking to build *winnertakesall* bags of words
 [HGH] Connected to redis
 [HGH] Connected to hipparchiaDB on PostgreSQL
 [HGH] No redis key; gathering lines with a direct CLI PostgreSQL query%!(EXTRA string=hipparchiaDB)
-[HGH] found 53872 sentences [D: 1.237893s]
-[HGH] foundmorph contains 65693
-[HGH] Got morphology [F: 10.948613s]
-[HGH] contents of bag[0]: quis² alter
-[HGH] contents of bag[1]: aquilus alter metuo
-[HGH] Reached result @ 18.474062s]
-bags have been stored at _vectorresultsWed May  5 16:27:45 EDT 2021
-
-retest of cicero via unnest array morphology:
-
-1340 •erik@big-sur-box• e-gun/HipparchiaGoDBHelper/ % date && ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" && date
-Wed May  5 16:25:18 EDT 2021
-[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.0.0.2) [loglevel=3]
-[HGH] Seeking to build *winnertakesall* bags of words
-[HGH] Connected to redis
-[HGH] Connected to hipparchiaDB on PostgreSQL
-[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query%!(EXTRA string=hipparchiaDB)
-[HGH] found 53872 sentences [D: 1.290680s]
-[HGH] foundmorph contains 64923 members
-[HGH] Got morphology [F: 2.627149s]
-[HGH] contents of bag[0]: quis² alter
-[HGH] contents of bag[1]: aquilius alter metuo
-[HGH] Reached result @ 10.358161s]
-bags have been stored at _vectorresultsWed May  5 16:25:29 EDT 2021
-
-
-retest of cicero via unnest array morphology AND recursive split of the text
-
-date && ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" && date
-Thu May  6 12:52:29 EDT 2021
-[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.0.0.4) [loglevel=3]
-[HGH] Seeking to build *winnertakesall* bags of words
-[HGH] Connected to redis
-[HGH] Connected to hipparchiaDB on PostgreSQL
-[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query%!(EXTRA string=hipparchiaDB)
-[HGH] found 79683 sentences [D: 1.590132s]
+[HGH] found 79683 sentences [D: 1.803721s]
 [HGH] foundmorph contains 65693 members
-[HGH] Got morphology [F: 3.167224s]
+[HGH] Got morphology [F: 12.326225s]
+[HGH] contents of bag[0]:
+[HGH] contents of bag[1]: qui² alter
+[HGH] Reached result @ 21.866201s]
+bags have been stored at _vectorresultsFri May  7 15:05:29 EDT 2021
+
+
+
+1062 •erik@big-sur-box• e-gun/HipparchiaGoDBHelper/ %  date && ./HipparchiaGoDBHelper -sv -l 5 -svdb lt0474 -svs 4 -sve 140000 -k "" -p ${L} && date
+Fri May  7 15:21:46 EDT 2021
+[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.0.1.6) [loglevel=5]
+[HGH] Seeking to build *winnertakesall* bags of words
+[HGH] Connected to redis
+[HGH] Connected to hipparchiaDB on PostgreSQL
+[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query%!(EXTRA string=hipparchiaDB)
+[HGH] unified text block built [B: 0.275347s])
+[HGH] preliminary cleanups complete [C: 0.353454s])
+[HGH] found 79683 sentences [D: 1.397037s]
+[HGH] found 79975 distinct words [E: 1.458788s]
+[HGH] foundmorph contains 65693 members
+[HGH] Got morphology [F: 2.731060s]
+[HGH] Build morphdict [F1: 5.445373s]
+[HGH] Pre-Bagging [F2: 5.477660s]
+[HGH] Post-Bagging [F3: 5.713629s]
 [HGH] contents of bag[0]:
 [HGH] contents of bag[1]: qui¹ alter
-[HGH] Reached result @ 13.265072s]
-bags have been stored at _vectorresultsThu May  6 12:52:42 EDT 2021
+[HGH] Reached result @ 12.170620s]
+bags have been stored at _vectorresultsFri May  7 15:21:58 EDT 2021
+
+
+50% of your time is spent storing the bags
+finding the morphology takes less time than building the morph dict...
+
+
+parallel loading of redis speeds things up...
+
+date && ./HipparchiaGoDBHelper -sv -l 5 -svdb lt0474 -svs 4 -sve 140000 -k "" -p ${L} && date
+Fri May  7 16:44:25 EDT 2021
+[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.0.1.6) [loglevel=5]
+[HGH] Seeking to build *winnertakesall* bags of words
+[HGH] Connected to redis
+[HGH] Connected to hipparchiaDB on PostgreSQL
+[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query%!(EXTRA string=hipparchiaDB)
+[HGH] unified text block built [B: 0.285670s])
+[HGH] preliminary cleanups complete [C: 0.360582s])
+[HGH] found 79683 sentences [D: 1.409095s]
+[HGH] found 79975 distinct words [E: 1.469624s]
+[HGH] foundmorph contains 65693 members
+[HGH] Got morphology [F: 2.764460s]
+[HGH] Build morphdict [F1: 5.540167s]
+[HGH] Pre-Bagging [F2: 5.574815s]
+[HGH] Post-Bagging [F3: 5.820767s]
+(0) sentences[0 : 15936]
+(1) sentences[15936 : 31872]
+(2) sentences[31872 : 47808]
+(3) sentences[47808 : 63744]
+(4) sentences[63744 : 79680]
+[HGH] Reached result @ 7.345995s]
+bags have been stored at _vectorresultsFri May  7 16:44:32 EDT 2021
+

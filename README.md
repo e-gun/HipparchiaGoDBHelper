@@ -29,3 +29,20 @@ VECTOR PREP builds bags for modeling; to do this you need to...
 once you reach this point python can fetch the bags and then run "Word2Vec(bags, parameters, ...)"
 
 ```
+
+
+
+---
+## Using this as a python module
+
+
+`gopy` does not automatically generate the right `import` statements in `go.py` and
+`hipparchiagolangsearching.py`
+
+You need to fix this...
+
+This fix has been automated on macos (see `macos-module-build_install_archive.sh`).
+BUT it seems like the paths are fundamentally broken for `linux` since there are bad
+import calls lodged inside of the binary `.so`. Ouch.
+
+`gopy` will fix this some day?
