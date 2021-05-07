@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 func fetchdblinesdirectly(thedb string, thestart int, theend int, dbpool *pgxpool.Pool) map[int]DbWorkline {
@@ -34,17 +35,6 @@ func fetchdblinesdirectly(thedb string, thestart int, theend int, dbpool *pgxpoo
 		dblines[count] = thehit
 	}
 	return dblines
-}
-
-func storebagsofwords(searchkey string, bags []SentenceWithLocus, redisclient *redis.Client) string {
-	kk := strings.Split(searchkey, "_")
-	resultkey := kk[0] + "_vectorresults"
-	for i := 0; i < len(bags); i++ {
-		jsonhit, err := json.Marshal(bags[i])
-		checkerror(err)
-		redisclient.SAdd(resultkey, jsonhit)
-	}
-	return resultkey
 }
 
 func looptogetrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
@@ -244,4 +234,15 @@ func fetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[
 		returnmap[thehit.Word] = thehit.Count
 	}
 	return returnmap
+}
+
+func parallelredisloader(resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
+	for i := 0; i < len(bags); i++ {
+		jsonhit, err := json.Marshal(bags[i])
+		checkerror(err)
+		redisclient.SAdd(resultkey, jsonhit)
+	}
+	// don't actually need to report the key because we know it...
+	// ch <- resultkey
+	wg.Done()
 }

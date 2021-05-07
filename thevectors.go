@@ -186,7 +186,9 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 
 	// unlemmatized bags of words customers have in fact reached their target as of now
 	if baggingmethod == "unlemmatized" {
-		resultkey := storebagsofwords(searchkey, sentences, redisclient)
+		kk := strings.Split(searchkey, "_")
+		resultkey := kk[0] + "_vectorresults"
+		loadthebags(resultkey, goroutines, sentences, redisclient)
 		// DO NO comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer
 		// "resultrediskey = resultrediskey.split()[-1]"
 		fmt.Println(fmt.Sprintf("%d %s bags of words stored at %s", len(sentences), baggingmethod, resultkey))
@@ -264,7 +266,8 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 		}
 	}
 
-	logiflogging(fmt.Sprintf("Build morphdict [F1: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
+	// the above is interestingly slow... not super-slow, but still relatively slow: 3s in Cicero
+	logiflogging(fmt.Sprintf("Build morphdict [F1: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
 
 	// no need for the "bool" any longer; demap things
 	flatdict := make(map[string][]string, len(morphdict))
@@ -279,7 +282,8 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	//for q := range flatdict {
 	//	fmt.Println(fmt.Sprintf("%s:\n\t%s", q, flatdict[q]))
 	//}
-	logiflogging(fmt.Sprintf("Pre-Bagging [F2: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
+	logiflogging(fmt.Sprintf("Pre-Bagging [F2: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
+
 	switch baggingmethod {
 	case "flat":
 		sentences = buildflatbagsofwords(sentences, flatdict)
@@ -290,61 +294,37 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	default:
 		logiflogging(fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", baggingmethod), loglevel, 0)
 	}
-	logiflogging(fmt.Sprintf("Post-Bagging [F3: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
+	logiflogging(fmt.Sprintf("Post-Bagging [F3: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
 
-	bags := 5
-	work := len(sentences)
-	chunksize := work / bags
-	// leftover := work % bags
-	bagsofbags := make(map[int][]SentenceWithLocus, bags)
-
-	thestart = 0
-	for i := 0; i < bags; i++ {
-		fmt.Println(fmt.Sprintf("(%d) sentences[%d : %d]", i, thestart, thestart+chunksize))
-		bagsofbags[i] = sentences[thestart : thestart+chunksize]
-		thestart = thestart + chunksize
-	}
-
-	// bagsofbags[bags-1] = append(bagsofbags[bags-1], sentences[work-leftover:work]...)
-
-	var resultkey string
 	kk := strings.Split(searchkey, "_")
-	resultkey = kk[0] + "_vectorresults"
+	resultkey := kk[0] + "_vectorresults"
 
-	var wg sync.WaitGroup
+	loadthebags(resultkey, goroutines, sentences, redisclient)
 
-	//loader := func (searchkey string, resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
-	//	for i := 0; i < len(bags); i++ {
-	//		jsonhit, err := json.Marshal(bags[i])
-	//		checkerror(err)
-	//		redisclient.SAdd(resultkey, jsonhit)
-	//	}
-	//	// ch <- resultkey
-	//	wg.Done()
-	//}
-
-	for i := 0; i < bags; i++ {
-		wg.Add(1)
-		go parallelloader(searchkey, resultkey, bagsofbags[i], redisclient, &wg)
-	}
-
-	wg.Wait()
-
-	//resultkey := storebagsofwords(searchkey, sentences, redisclient)
-	//if len(sentences) > 1 {
-	//	logiflogging(fmt.Sprintf("contents of bag[0]: %s", sentences[0].Sent), loglevel, 3)
-	//	logiflogging(fmt.Sprintf("contents of bag[1]: %s", sentences[1].Sent), loglevel, 3)
-	//}
 	logiflogging(fmt.Sprintf("Reached result @ %fs]", time.Now().Sub(start).Seconds()), loglevel, 1)
 	return resultkey
 }
 
-func parallelloader(searchkey string, resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
-	for i := 0; i < len(bags); i++ {
-		jsonhit, err := json.Marshal(bags[i])
-		checkerror(err)
-		redisclient.SAdd(resultkey, jsonhit)
+func loadthebags(resultkey string, goroutines int, sentences []SentenceWithLocus, redisclient *redis.Client) {
+	totalwork := len(sentences)
+	chunksize := totalwork / goroutines
+	leftover := totalwork % goroutines
+	bagsofbags := make(map[int][]SentenceWithLocus, goroutines)
+
+	thestart := 0
+	for i := 0; i < goroutines; i++ {
+		bagsofbags[i] = sentences[thestart : thestart+chunksize]
+		thestart = thestart + chunksize
 	}
-	// ch <- resultkey
-	wg.Done()
+	// leave no sentence behind!
+	if leftover > 0 {
+		bagsofbags[goroutines-1] = append(bagsofbags[goroutines-1], sentences[totalwork-leftover-1:totalwork-1]...)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go parallelredisloader(resultkey, bagsofbags[i], redisclient, &wg)
+	}
+	wg.Wait()
 }
