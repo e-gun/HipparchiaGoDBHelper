@@ -81,3 +81,15 @@ type MorphPossibility struct {
 	Xref     string
 	TrAnal   string
 }
+
+type CompositePollingData struct {
+	// this has to be kept in sync with rediskeys[8] and HipparchiaServer's interface
+	Launchtime    float64
+	Active        string
+	Statusmessage string
+	Remaining     int64
+	Poolofwork    int64
+	Hitcount      int64
+	Portnumber    int64
+	Notes         string
+}

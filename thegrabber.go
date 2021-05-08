@@ -27,6 +27,7 @@ import (
 //HipparchiaGolangSearcher: Execute a series of SQL queries stored in redis by dispatching a collection of goroutines
 func HipparchiaGolangSearcher(searchkey string, hitcap int64, goroutines int, loglevel int, r RedisLogin, p PostgresLogin) string {
 	// this is the code that the python module version is calling instead of main()
+	logiflogging(fmt.Sprintf("Searcher Module Launched"), loglevel, 1)
 	runtime.GOMAXPROCS(goroutines)
 
 	recordinitialsizeofworkpile(searchkey, loglevel, r)

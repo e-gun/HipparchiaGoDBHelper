@@ -38,6 +38,7 @@ import (
 func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, thedb string, thestart int, theend int,
 	loglevel int, r RedisLogin, p PostgresLogin) string {
 
+	logiflogging(fmt.Sprintf("Bagger Module Launched"), loglevel, 1)
 	start := time.Now()
 	logiflogging(fmt.Sprintf("Seeking to build *%s* bags of words", baggingmethod), loglevel, 2)
 
@@ -325,6 +326,7 @@ func loadthebags(resultkey string, goroutines int, sentences []SentenceWithLocus
 			bagsofbags[goroutines-1] = append(bagsofbags[goroutines-1], sentences[totalwork-leftover-1:totalwork-1]...)
 		}
 	}
+
 	var wg sync.WaitGroup
 	for i := 0; i < goroutines; i++ {
 		wg.Add(1)

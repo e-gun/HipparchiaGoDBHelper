@@ -44,12 +44,13 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "0.1.8"
+	version         = "0.2.0"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
 	testend         = 26
 	linelength      = 72
+	pollinginterval = 400 * time.Millisecond
 )
 
 //
@@ -58,18 +59,6 @@ const (
 
 func main() {
 	versioninfo := fmt.Sprintf("%s CLI Debugging Interface (v.%s)", myname, version)
-
-	var k string
-	var c int64
-	var g int
-	var l int
-	var r string
-	var p string
-
-	var dbdb string
-	var dbdbs int
-	var dbdbe int
-	var b string
 
 	// WARNING: a password is going to be hard-coded into the binary. It is easy to use the binary in HipparchiaServer
 	// without providing valid credentials to the binary, but if you do you must pass them and your credentials will be
@@ -80,21 +69,45 @@ func main() {
 		PSQ = `{"Host": "localhost", "Port": 5432, "User": "hippa_wr", "Pass": "", "DBName": "hipparchiaDB"}`
 	)
 
-	flag.StringVar(&k, "k", "go", "redis key to use")
-	flag.Int64Var(&c, "c", 200, "max hit count")
-	flag.IntVar(&g, "t", 5, "number of goroutines to dispatch")
-	flag.IntVar(&l, "l", 1, "logging level: 0 is silent; 5 is very noisy")
-	flag.StringVar(&r, "r", RP, "redis logon information (as a JSON string)")
-	flag.StringVar(&p, "p", PSQ, "psql logon information (as a JSON string)")
+	var k string
+	var c int64
+	var g int
+	var l int
+	var r string
+	var p string
+
+	flag.StringVar(&k, "k", "go", "[searches] redis key to use")
+	flag.Int64Var(&c, "c", 200, "[searches] max hit count")
+	flag.IntVar(&g, "t", 5, "[common] number of goroutines to dispatch")
+	flag.IntVar(&l, "l", 1, "[common] logging level: 0 is silent; 5 is very noisy")
+	flag.StringVar(&r, "r", RP, "[common] redis logon information (as a JSON string)")
+	flag.StringVar(&p, "p", PSQ, "[common] psql logon information (as a JSON string)")
 
 	// vector flags
+
+	var dbdb string
+	var dbdbs int
+	var dbdbe int
+	var b string
+
 	flag.StringVar(&b, "svb", "winnertakesall", "[vectors] the bagging method: choices are alternates, flat, unlemmatized, winnertakesall")
 	flag.StringVar(&dbdb, "svdb", testdb, "[vectors][for manual debugging] db to grab from")
 	flag.IntVar(&dbdbs, "svs", teststart, "[vectors][for manual debugging] first line to grab")
 	flag.IntVar(&dbdbe, "sve", testend, "[vectors][for manual debugging] last line to grab")
 	sv := flag.Bool("sv", false, "[vectors] assert that this is a vectorizing run")
 
-	v := flag.Bool("v", false, "print version and exit")
+	// websocket flags
+
+	var wsp int
+	var wsf int
+	var wss int
+
+	ws := flag.Bool("ws", false, "[websockets] assert that you are requesting the websocket server")
+	flag.IntVar(&wsp, "wsp", 5010, "[websockets] port on which to open the websocket server")
+	flag.IntVar(&wsf, "wsf", 4, "[websockets] fail threshold before messages stop being sent")
+	flag.IntVar(&wss, "wss", 0, "[websockets] save the polls instead of deleting them: 0 is no; 1 is yes")
+
+	v := flag.Bool("v", false, "[common] print version and exit")
 	flag.Parse()
 
 	if *v {
@@ -121,14 +134,19 @@ func main() {
 	var t int64
 	var x string
 
-	if !*sv {
-		o = HipparchiaGolangSearcher(k, c, g, l, rl, po)
-		t = fetchfinalnumberofresults(k, rl)
-		x = "hits"
-	} else {
+	if *sv {
+		// vectors
 		o = HipparchiaBagger(k, b, g, dbdb, dbdbs, dbdbe, l, rl, po)
 		x = "bags"
 		t = -1
+	} else if *ws {
+		// websockets
+		StartHipparchiaPollWebsocket(wsp, l, wsf, wss, rl)
+	} else {
+		// searcher
+		o = HipparchiaGolangSearcher(k, c, g, l, rl, po)
+		t = fetchfinalnumberofresults(k, rl)
+		x = "hits"
 	}
 
 	// DO NOT comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer when GOLANGLOADING = 'cli'
