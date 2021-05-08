@@ -78,7 +78,7 @@ func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving
 		// the flow is a bit fussy, but separation should allow for easier maintenance if/when things
 		// change on HipparchiaServer's end
 		redisvals := retrievepollingdata(searchid, rediskeys, loglevel, redisclient)
-		cpd := typeconvertpollingdata(rediskeys, redisvals)
+		cpd := typeconvertpollingdata(searchid, rediskeys, redisvals)
 		jsonreply, err := json.Marshal(cpd)
 		checkerror(err)
 		e := m.Broadcast(jsonreply)
@@ -124,7 +124,7 @@ func retrievepollingdata(searchid string, rediskeys [8]string, loglevel int, rc 
 	return redisvals
 }
 
-func typeconvertpollingdata(rediskeys [8]string, redisvals [8]string) CompositePollingData {
+func typeconvertpollingdata(searchid string, rediskeys [8]string, redisvals [8]string) CompositePollingData {
 	// everything arrives as a string; but that is not right
 	// https://stackoverflow.com/questions/6395076/using-reflect-how-do-you-set-the-value-of-a-struct-field/6396678#6396678
 	// https://samwize.com/2015/03/20/how-to-use-reflect-to-set-a-struct-field/
@@ -136,7 +136,7 @@ func typeconvertpollingdata(rediskeys [8]string, redisvals [8]string) CompositeP
 	//	[a] determine the kind of the data required for this value
 	//	[b] convert the string we have stared at redisvals into the proper type
 	//	[c] store the converted data in the right field inside of cpd
-
+	cpd.ID = searchid
 	for i := 0; i < len(redisvals); i++ {
 		// sadly we have to capitalize the fields to export them and this means they do not match the source
 		n := strings.Title(rediskeys[i])

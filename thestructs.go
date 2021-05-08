@@ -92,4 +92,5 @@ type CompositePollingData struct {
 	Hitcount      int64
 	Portnumber    int64
 	Notes         string
+	ID            string
 }
