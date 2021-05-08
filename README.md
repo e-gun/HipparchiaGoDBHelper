@@ -1,8 +1,10 @@
 # HipparchiaGoDBHelper
 
-This is a merge of the soon to be defunct `HipparchiaGoGrabberModule` and `HipparchiaGoVectorHelper`.
+This is a merge of three now defunct projects: `HipparchiaGoGrabberModule`,  `HipparchiaGoVectorHelper`, and `HipparchiaGoWebSocketApp`.
 
-The latter was too convergent with the former + needed to be able to grab directly for speed reasons.
+`HipparchiaGoVectorHelper` was too convergent with `HipparchiaGoGrabberModule` + it needed to be able to grab directly 
+for speed reasons. After that it seemed like one might as well just use a single binary
+instead of a collection of them: so the websockets got folded in too. 
 
 ```
 the GRABBER is supposed to be pointedly basic
@@ -29,8 +31,16 @@ VECTOR PREP builds bags for modeling; to do this you need to...
 once you reach this point python can fetch the bags and then run "Word2Vec(bags, parameters, ...)"
 
 ```
+```
+WEBSOCKETS broadcasts search information for web page updates
 
+[a] it launches and starts listening on a port
+[b] it waits to receive a websocket message: this is a search key ID (e.g., '2f81c630')
+[c] it then looks inside of redis for the relevant polling data associated with that search ID
+[d] it parses, packages (as JSON), and then redistributes this information back over the websocket
+[e] when the poll disappears from redis, the messages stop broadcasting
 
+```
 
 ---
 ## Using this as a python module
@@ -46,3 +56,10 @@ BUT it seems like the paths are fundamentally broken for `linux` since there are
 import calls lodged inside of the binary `.so`. Ouch.
 
 `gopy` will fix this some day?
+
+
+NB: the `websockets` can be launched as a module, but the `GIL` will render
+them useless. They should be called via `subprocess.Popen()` instead. But
+both the `grabber` and the `bagger` can be used either via the module or
+the cli. Module invocation is in fact preferred in a multi-user environment
+for security reasons. 

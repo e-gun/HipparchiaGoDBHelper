@@ -3,18 +3,19 @@
 //    License: GNU GENERAL PUBLIC LICENSE 3
 //        (see LICENSE in the top level directory of the distribution)
 
-// HipparchiaGoVectorHelper and HipparchiaGoGrabberModule have been made to converge:
-// the vector code needed to be able to search
+// HipparchiaGoVectorHelper and HipparchiaGoGrabberModule and HipparchiaGoWebSocketApp have been made to converge:
+// the vector code needed to be able to search; and maybe there is no need for 2 or 3 binaries
 //
-// the GRABBER is supposed to be pointedly basic
+// [I] the GRABBER is supposed to be pointedly basic
+//
 // [a] it looks to redis for a pile of SQL queries that were pre-rolled
 // [b] it asks postgres to execute these queries
 // [c] it stores the results on redis
 // [d] it also updates the redis progress poll data relative to this search
 //
 
-// VECTOR PREP builds bags for modeling; to do this you need to...
-
+// [II] VECTOR PREP builds bags for modeling; to do this you need to...
+//
 // [a] grab db lines that are relevant to the search
 // [b] turn them into a unified text block
 // [c] do some preliminary cleanups
@@ -26,6 +27,15 @@
 // [i] store the bags
 //
 // once you reach this point python can fetch the bags and then run "Word2Vec(bags, parameters, ...)"
+//
+
+//  [III] WEBSOCKETS broadcasts search information for web page updates
+//
+//	[a] it launches and starts listening on a port
+//	[b] it waits to receive a websocket message: this is a search key ID (e.g., '2f81c630')
+//	[c] it then looks inside of redis for the relevant polling data associated with that search ID
+//	[d] it parses, packages (as JSON), and then redistributes this information back over the websocket
+//	[e] when the poll disappears from redis, the messages stop broadcasting
 //
 
 // toggle the package name to shift between cli and module builds: main or hipparchiagolangsearching
@@ -44,7 +54,7 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "0.2.0"
+	version         = "0.2.1"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1

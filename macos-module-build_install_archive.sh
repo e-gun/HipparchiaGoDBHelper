@@ -1,7 +1,7 @@
 #!/bin/sh
 # attempt to fix the import problems that gopy leaves behind
 # you need gsed; "brew install gnu-sed"
-A="../HipparchiaGoBinaries/gohelper/module"
+A="../HipparchiaGoBinaries/module"
 H="${HOME}/hipparchia_venv/HipparchiaServer/server/golangmodule/"
 
 # toggle build style if needed
@@ -16,11 +16,14 @@ gsed -i "s/import go/from server.golangmodule import go/" golangmodule/hipparchi
 cp -rpv ./golangmodule/* ${H}
 V=`grep version hipparchiagolanghelper.go | grep '= "' | cut -d '"' -f 2`
 U=`uname`
-mv ./golangmodule ./golangmodule-${U}-${V}
-tar jcf ${A}/golangmodule-${U}-${V}.tbz ./golangmodule-${U}-${V}
+mv ./golangmodule ./golangmodule-${U}-v.${V}
+tar jcf ${A}/golangmodule-${U}-v.${V}.tbz ./golangmodule-${U}-v.${V}
 
-mv ./golangmodule-${U}-${V} ./golangmodule-${U}-latest
+mv ./golangmodule-${U}-v.${V} ./golangmodule-${U}-latest
 tar jcf ${A}/golangmodule-${U}-latest.tbz ./golangmodule-${U}-latest
 
 rm -rf ./golangmodule-${U}-latest
-rm -rf ./golangmodule-${U}-${V}
+rm -rf ./golangmodule-${U}-v.${V}
+
+echo "Latest is ${U} v.${V}" > ${A}/latest_${U}.txt
+
