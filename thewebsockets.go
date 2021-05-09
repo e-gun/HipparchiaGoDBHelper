@@ -20,6 +20,7 @@ import (
 	"github.com/go-redis/redis"
 	"gopkg.in/olahol/melody.v1"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -43,10 +44,14 @@ func StartHipparchiaPollWebsocket(port int, loglevel int, failthreshold int, sav
 	})
 
 	m.HandleMessage(func(s *melody.Session, searchid []byte) {
-		// at this point you have "ebf24e19" and NOT ebf24e19; fix that
-		id := string(searchid[1 : len(searchid)-1])
-		logiflogging(fmt.Sprintf("id is %s", id), loglevel, 1)
-		runpollmessageloop(id, loglevel, failthreshold, saving, rl, m)
+		if len(searchid) < 16 {
+			// at this point you have "ebf24e19" and NOT ebf24e19; fix that
+			id := string(searchid[1 : len(searchid)-1])
+			keycleaner := regexp.MustCompile(`[^a-f0-9]`)
+			id = keycleaner.ReplaceAllString(id, "")
+			logiflogging(fmt.Sprintf("id is %s", id), loglevel, 1)
+			runpollmessageloop(id, loglevel, failthreshold, saving, rl, m)
+		}
 	})
 
 	err := r.Run(fmt.Sprintf(":%d", port))
@@ -73,7 +78,7 @@ func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving
 	iterations := 0
 	for {
 		iterations += 1
-		logiflogging(fmt.Sprintf("%s - runpollmessageloop() is on iteration #%d", searchid, iterations), loglevel, 1)
+		logiflogging(fmt.Sprintf("WebSocket server reports that runpollmessageloop() for %s is on iteration #%d", searchid, iterations), loglevel, 1)
 		time.Sleep(pollinginterval)
 		// the flow is a bit fussy, but separation should allow for easier maintenance if/when things
 		// change on HipparchiaServer's end
@@ -163,15 +168,25 @@ func typeconvertpollingdata(searchid string, rediskeys [8]string, redisvals [8]s
 				v = 0
 			}
 			reflect.ValueOf(&cpd).Elem().FieldByName(n).SetInt(int64(v))
+		case reflect.Bool:
+			// not actually used, but...
+			v, err := strconv.ParseBool(redisvals[i])
+			if err != nil {
+				v = false
+			}
+			reflect.ValueOf(&cpd).Elem().FieldByName(n).SetBool(v)
 		}
 	}
 	return cpd
 }
 
 func deletewhendone(searchid string, rediskeys [8]string, loglevel int, rc *redis.Client) {
+	// make sure that the "there is no work" message gets propagated
+	rc.Set(searchid+"_poolofwork", -1, redisexpiration)
+	time.Sleep(pollinginterval)
 	// get rid of the polling keys
 	for i := 0; i < len(rediskeys); i++ {
 		_, _ = rc.Del(fmt.Sprintf("%s_%s", searchid, rediskeys[i])).Result()
 	}
-	logiflogging(fmt.Sprintf("deleted redis keys for %s", searchid), loglevel, 1)
+	logiflogging(fmt.Sprintf("deleted redis keys for %s", searchid), loglevel, 2)
 }

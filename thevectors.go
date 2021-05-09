@@ -227,6 +227,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	// lookformorphologymatches()
 
 	// can only send the keys to getrequiredmorphobjects(); so we need to demap things
+
 	keys := make([]string, 0, len(allwords))
 	for k := range allwords {
 		keys = append(keys, k)
@@ -261,6 +262,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 				// X is already present in 'morphdict'; need to add this headword to the set of headwords
 				morphdict[pp[i].Observed][pp[i].Entry] = true
 			} else {
+				// ὑπέρ-ἀθλέω and ἀνά-τίω are in here: if you "fix" them you you won't be left with a proper headword anyway...
 				morphdict[pp[i].Observed] = make(map[string]bool)
 				morphdict[pp[i].Observed][pp[i].Entry] = true
 			}

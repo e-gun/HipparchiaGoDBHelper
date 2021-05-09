@@ -1,4 +1,4 @@
-//    HipparchiaGoDBHelper: search and vector helper app and functions for HipparchiaServer
+//    HipparchiaGoDBHelper: search, vector and websocket helper app and functions for HipparchiaServer
 //    Copyright: E Gunderson 2016-21
 //    License: GNU GENERAL PUBLIC LICENSE 3
 //        (see LICENSE in the top level directory of the distribution)
@@ -54,7 +54,7 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "0.2.2"
+	version         = "0.2.4"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -114,7 +114,7 @@ func main() {
 
 	ws := flag.Bool("ws", false, "[websockets] assert that you are requesting the websocket server")
 	flag.IntVar(&wsp, "wsp", 5010, "[websockets] port on which to open the websocket server")
-	flag.IntVar(&wsf, "wsf", 4, "[websockets] fail threshold before messages stop being sent")
+	flag.IntVar(&wsf, "wsf", 3, "[websockets] fail threshold before messages stop being sent")
 	flag.IntVar(&wss, "wss", 0, "[websockets] save the polls instead of deleting them: 0 is no; 1 is yes")
 
 	v := flag.Bool("v", false, "[common] print version and exit")

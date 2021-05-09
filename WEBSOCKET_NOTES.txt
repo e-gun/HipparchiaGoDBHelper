@@ -1,0 +1,16 @@
+# for testing the websocket server function
+
+$ ./HipparchiaGoDBHelper -l 3 -ws -wsp 5011
+
+JSCONSOLE in a browser:
+let s = new WebSocket('ws://localhost:5011/');
+s.onmessage = function (msg) { console.log(msg.data) };
+s.send('"5c337a13"');
+
+#
+# misc URLS
+#
+
+https://tutorialedge.net/golang/go-redis-tutorial/
+https://github.com/olahol/melody
+https://github.com/golang-standards/project-layout
