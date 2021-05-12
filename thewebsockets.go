@@ -46,9 +46,9 @@ func StartHipparchiaPollWebsocket(port int, loglevel int, failthreshold int, sav
 	m.HandleMessage(func(s *melody.Session, searchid []byte) {
 		if len(searchid) < 16 {
 			// at this point you have "ebf24e19" and NOT ebf24e19; fix that
-			id := string(searchid[1 : len(searchid)-1])
+			// id := string(searchid[1 : len(searchid)-1])
 			keycleaner := regexp.MustCompile(`[^a-f0-9]`)
-			id = keycleaner.ReplaceAllString(id, "")
+			id := keycleaner.ReplaceAllString(string(searchid), "")
 			logiflogging(fmt.Sprintf("id is %s", id), loglevel, 1)
 			runpollmessageloop(id, loglevel, failthreshold, saving, rl, m)
 		}
