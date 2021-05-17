@@ -8,6 +8,7 @@ package main
 import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -67,6 +68,14 @@ func buildflatbagsofwords(bags []SentenceWithLocus, parsemap map[string][]string
 		}
 		bags[i].Sent = strings.Join(newwords, " ")
 	}
+
+	// peek at a bag...
+	//for i := 0; i < len(bags); i++ {
+	//	if strings.Contains(bags[i].Sent, "ωκρ") {
+	//		fmt.Println(fmt.Sprintf("%s: %s", bags[i].Loc, bags[i].Sent))
+	//	}
+	//}
+
 	return bags
 }
 
@@ -104,27 +113,45 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 
 	scoremap := loopfetchheadwordcounts(allheadwords, dbpool)
 
-	// [c] run through the parsemap and kill off the losers
+	// [c] note that there are capital words in here that need lowering
+	// [c1] lower the internal values first
+	for i := range parsemap {
+		for j := 0; j < len(parsemap[i]); j++ {
+			parsemap[i][j] = strings.ToLower(parsemap[i][j])
+		}
+	}
+
+	// [c2] lower the keys; how worried should we be about the collisions...
+	lcparsemap := make(map[string][]string)
+	for i := range parsemap {
+		lcparsemap[strings.ToLower(i)] = parsemap[i]
+	}
+
+	// [d] run through the parsemap and kill off the losers
 
 	newparsemap := make(map[string][]string)
-	for i := range parsemap {
+	for i := range lcparsemap {
 		var hwl WHWList
-		for j := 0; j < len(parsemap[i]); j++ {
+		for j := 0; j < len(lcparsemap[i]); j++ {
 			var thishw WeightedHeadword
-			thishw.Word = parsemap[i][j]
-			thishw.Count = scoremap[thishw.Word]
+			thishw.Word = lcparsemap[i][j]
+			thishw.Count = scoremap[lcparsemap[i][j]]
 			hwl = append(hwl, thishw)
 		}
-		//sort.Sort(hwl)
-		//if strings.Contains(hwl[0].Word, "ωκρ") {
-		//	fmt.Println(fmt.Sprintf("%s", hwl[0].Word))
-		//}
+		sort.Sort(hwl)
 
 		newparsemap[i] = make([]string, 0, 1)
 		newparsemap[i] = append(newparsemap[i], hwl[0].Word)
 	}
 
-	// [d] now you can just buildflatbagsofwords() with the new pruned parsemap
+	// [e] now you can just buildflatbagsofwords() with the new pruned parsemap
+
+	// peek at a winner...
+	//for i := range newparsemap {
+	//	if strings.Contains(i, "ωκρ") {
+	//		fmt.Println(fmt.Sprintf("[ZZ] %s %s", i, newparsemap[i]))
+	//	}
+	//}
 
 	bags = buildflatbagsofwords(bags, newparsemap)
 

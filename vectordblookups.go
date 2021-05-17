@@ -239,8 +239,12 @@ func loopfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) 
 
 	for i := range hw {
 		//if strings.Contains(hw[i], "ωκρ") {
-		//	fmt.Println(fmt.Sprintf("%s", hw[i]))
+		//	fmt.Println(fmt.Sprintf("%s: %d", hw[i], returnmap[hw[i]]))
 		//}
+		//[debugging] ϲωκρατέω: 7426 [debugging]
+		//[debugging] Ϲωκράτηϲ: 13493 [debugging]
+		//[debugging] Ϲωκρατέω: 0 [debugging]
+
 		if _, t := returnmap[hw[i]]; t {
 			continue
 		} else {
@@ -249,6 +253,24 @@ func loopfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) 
 			returnmap[hw[i]] = 0
 		}
 	}
+
+	// a problem remains: the text is lower-case, but you have upper-case items in your scoremap
+	// need lower the cases
+
+	//lcreturnmap := make(map[string]int)
+	//
+	//for i:= range returnmap {
+	//	if strings.ToLower(i) != i {
+	//		//fmt.Println(fmt.Sprintf("upper: %s", i))
+	//		//fmt.Println(fmt.Sprintf("lower: %s = %d", strings.ToLower(i), returnmap[i]))
+	//		if returnmap[i] > returnmap[strings.ToLower(i)] {
+	//			returnmap[strings.ToLower(i)] = returnmap[i]
+	//			delete(returnmap, i)
+	//		}
+	//	} else {
+	//		lcreturnmap[i] = returnmap[i]
+	//	}
+	//}
 
 	return returnmap
 }
