@@ -8,8 +8,12 @@ package main
 import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"regexp"
-	"sort"
 	"strings"
+)
+
+const (
+	skipheadwords = "omne νωδόϲ aut eccere quin tu ambi fue hau¹ ἠμέν eu διό πρόϲ μέχριπερ αὐτόϲ περί ἀτάρ ὄφρα ῥά¹ πω² cata apage τίϲ per1 ne³ αὐτοῦ ἕ de² chaere ἄν² ἤ¹ euoe for neque εἶἑν b ab vaha ἐπί² ὅτι Juno euhoe sum¹ au μένω sine oho sui ὡϲ ehem istic¹ τοι¹ pro² ἤ² io¹ τήιοϲ em³ ohe abusque ἆρα² alius² μέϲφι atque fu em² γοῦν proh ἔτι cis vel παι bombax τίη πηρόϲ babae en edo¹ θην δέ si ai¹ in γάρον ἐάν heia οὐδείϲ hui eho quis¹ οὐ τῇ alleluja κατά¹ οὗτοϲ καί huc tatae heus! ad non ille verus κατά γίγνομαι ἄν¹ ζεύϲ ἄνω¹ ὁτιή ἐν πῃ δέ¹ cum γάροϲ μετά ἐκάϲ ἀλλά hallelujah eheu ἐξέτι incircum mu eo¹ προϲάμβ a praeterpropter et qui¹ tat evax venio ὅϲτιϲ penes νή² εἰϲ παρά γάρ ἀμφί ἤγουν oh ἰδέ¹ trans idem ἐπάν o² ἐκ ὅϲ ito res ἀνά ἠτε tenus² τοίνυν ἐπί papae ἄτερ atat verum τιϲ ἀπέκ st heu! ah εἰ εἰμί πᾶϲ buttuti am a² hem τοιγάρ ἄλλοϲ cum¹ οὖν ambe μή vah is οὐ² ὑπέκ hic sub τε μήν¹ μά¹ καὶ¹ ἐρι² οὕτωϲ euax ὑπό ipse an¹ quam vae Q ἄνα τε¹ de prior magnus phu² προπάροιθε hehae eia oiei εἰ¹ uls aha in¹ Pollux abs πλήν δή¹ ce ὅτι¹ μέν sed ἀπό θωρακοί hei τῷ πότε ego ha! a³ prox pol ex ei² dudum διά ὁ ut ὅτι² phy fi¹ ἐπεί¹ ἐγώ ϲύ ϲύν euge ho! ὁΐ oi γε ἡμόϲ"
+	skipinflected = "ita a inquit ego die nunc nos quid πάντων ἤ με θεόν δεῖ for igitur ϲύν b uers p ϲου τῷ εἰϲ ergo ἐπ ὥϲτε sua me πρό sic aut nisi rem πάλιν ἡμῶν φηϲί παρά ἔϲτι αὐτῆϲ τότε eos αὐτούϲ λέγει cum τόν quidem ἐϲτιν posse αὐτόϲ post αὐτῶν libro m hanc οὐδέ fr πρῶτον μέν res ἐϲτι αὐτῷ οὐχ non ἐϲτί modo αὐτοῦ sine ad uero fuit τοῦ ἀπό ea ὅτι parte ἔχει οὔτε ὅταν αὐτήν esse sub τοῦτο i omnes break μή ἤδη ϲοι sibi at mihi τήν in de τούτου ab omnia ὃ ἦν γάρ οὐδέν quam per α autem eius item ὡϲ sint length οὗ λόγον eum ἀντί ex uel ἐπειδή re ei quo ἐξ δραχμαί αὐτό ἄρα ἔτουϲ ἀλλ οὐκ τά ὑπέρ τάϲ μάλιϲτα etiam haec nihil οὕτω siue nobis si itaque uac erat uestig εἶπεν ἔϲτιν tantum tam nec unde qua hoc quis iii ὥϲπερ semper εἶναι e ½ is quem τῆϲ ἐγώ καθ his θεοῦ tibi ubi pro ἄν πολλά τῇ πρόϲ l ἔϲται οὕτωϲ τό ἐφ ἡμῖν οἷϲ inter idem illa n se εἰ μόνον ac ἵνα ipse erit μετά μοι δι γε enim ille an sunt esset γίνεται omnibus ne ἐπί τούτοιϲ ὁμοίωϲ παρ causa neque cr ἐάν quos ταῦτα h ante ἐϲτίν ἣν αὐτόν eo ὧν ἐπεί οἷον sed ἀλλά ii ἡ t te ταῖϲ est sit cuius καί quasi ἀεί o τούτων ἐϲ quae τούϲ minus quia tamen iam d διά primum r τιϲ νῦν illud u apud c ἐκ δ quod f quoque tr τί ipsa rei hic οἱ illi et πῶϲ φηϲίν τοίνυν s magis unknown οὖν dum text μᾶλλον λόγοϲ habet τοῖϲ qui αὐτοῖϲ suo πάντα uacat τίϲ pace ἔχειν οὐ κατά contra δύο ἔτι αἱ uet οὗτοϲ deinde id ut ὑπό τι lin ἄλλων τε tu ὁ cf δή potest ἐν eam tum μου nam θεόϲ κατ ὦ cui nomine περί atque δέ quibus ἡμᾶϲ τῶν eorum"
 )
 
 func stripper(item string, purge []string) string {
@@ -98,7 +102,7 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 
 	// [b] assign scores to each of them
 
-	scoremap := fetchheadwordcounts(allheadwords, dbpool)
+	scoremap := loopfetchheadwordcounts(allheadwords, dbpool)
 
 	// [c] run through the parsemap and kill off the losers
 
@@ -111,7 +115,11 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 			thishw.Count = scoremap[thishw.Word]
 			hwl = append(hwl, thishw)
 		}
-		sort.Sort(hwl)
+		//sort.Sort(hwl)
+		//if strings.Contains(hwl[0].Word, "ωκρ") {
+		//	fmt.Println(fmt.Sprintf("%s", hwl[0].Word))
+		//}
+
 		newparsemap[i] = make([]string, 0, 1)
 		newparsemap[i] = append(newparsemap[i], hwl[0].Word)
 	}

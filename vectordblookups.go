@@ -105,11 +105,18 @@ func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string
 		mo[k] = v
 	}
 
-	logiflogging(fmt.Sprintf("foundmorph contains %d members", len(mo)), 0, 0)
 	return mo
 }
 
 func arraytogetrequiredmorphobjects(wordlist []string, uselang string, dbpool *pgxpool.Pool) map[string]DbMorphology {
+	// look for the upper case matches too: Ϲωκράτηϲ and not just ϲωκρατέω (!)
+	var uppers []string
+	for i := 0; i < len(wordlist); i++ {
+		uppers = append(uppers, strings.Title(wordlist[i]))
+	}
+
+	wordlist = append(wordlist, uppers...)
+
 	// better to use an array, but pgx is balking if you try to pass the array as $1 at dbpool.Exec()
 	// yet this seems perfectly // to fetchheadwordcounts()
 
@@ -205,7 +212,48 @@ func getpossiblemorph(o string, p string) MorphPossibility {
 	return mp
 }
 
-func fetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
+func loopfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
+	// the slow way: via a loop
+	hw := make([]string, 0, len(headwordset))
+	for h := range headwordset {
+		hw = append(hw, h)
+	}
+
+	qt := "SELECT entry_name, total_count FROM dictionary_headword_wordcounts WHERE entry_name = $1"
+	returnmap := make(map[string]int)
+	for i := 0; i < len(hw); i++ {
+		foundrows, e := dbpool.Query(context.Background(), qt, hw[i])
+		checkerror(e)
+		defer foundrows.Close()
+		for foundrows.Next() {
+			var thehit WeightedHeadword
+			err := foundrows.Scan(&thehit.Word, &thehit.Count)
+			if err != nil {
+				fmt.Println(err)
+			}
+			returnmap[thehit.Word] = thehit.Count
+		}
+	}
+
+	// don't kill off unfound terms
+
+	for i := range hw {
+		//if strings.Contains(hw[i], "ωκρ") {
+		//	fmt.Println(fmt.Sprintf("%s", hw[i]))
+		//}
+		if _, t := returnmap[hw[i]]; t {
+			continue
+		} else {
+			// this should be mostly proper names
+			// fmt.Println(fmt.Sprintf("unfound set to 0: %s", hw[i]))
+			returnmap[hw[i]] = 0
+		}
+	}
+
+	return returnmap
+}
+
+func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
 	tt := "CREATE TEMPORARY TABLE temporary_headwordlist_%s AS SELECT headwords AS hw FROM unnest(ARRAY[$1]) headwords"
 	qt := "SELECT entry_name, total_count FROM dictionary_headword_wordcounts WHERE EXISTS " +
 		"(SELECT 1 FROM temporary_headwordlist_%s temptable WHERE temptable.hw = dictionary_headword_wordcounts.entry_name)"
@@ -217,6 +265,8 @@ func fetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[
 	}
 
 	arr := strings.Join(hw, ", ")
+	arr = "'" + arr + "'"
+
 	_, err := dbpool.Exec(context.Background(), fmt.Sprintf(tt, rndid), arr)
 	checkerror(err)
 
@@ -233,6 +283,16 @@ func fetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[
 		}
 		returnmap[thehit.Word] = thehit.Count
 	}
+
+	// don't kill off unfound terms
+	for i := range hw {
+		if _, t := returnmap[hw[i]]; t {
+			continue
+		} else {
+			returnmap[hw[i]] = 0
+		}
+	}
+
 	return returnmap
 }
 

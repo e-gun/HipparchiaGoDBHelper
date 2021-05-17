@@ -237,10 +237,6 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	mo = getrequiredmorphobjects(keys, dbpool)
 	logiflogging(fmt.Sprintf("Got morphology [F: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
 
-	//for k := range mo {
-	//	fmt.Println(fmt.Sprintf("%s", mo[k].Observed))
-	//}
-
 	// [g] figure out which headwords to associate with the collection of words
 
 	// see convertmophdicttodict()
@@ -275,19 +271,17 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	// no need for the "bool" any longer; demap things
 	flatdict := make(map[string][]string, len(morphdict))
 	for i := range morphdict {
-		keys := make([]string, 0, len(morphdict[i]))
+		thekeys := make([]string, 0, len(morphdict[i]))
 		for k := range morphdict[i] {
-			keys = append(keys, k)
+			thekeys = append(thekeys, k)
 		}
-		flatdict[i] = keys
+		flatdict[i] = thekeys
 	}
 
-	//for q := range flatdict {
-	//	fmt.Println(fmt.Sprintf("%s:\n\t%s", q, flatdict[q]))
-	//}
 	logiflogging(fmt.Sprintf("Pre-Bagging [F2: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
 
 	switch baggingmethod {
+	// see vectorparsingandbagging.go
 	case "flat":
 		sentences = buildflatbagsofwords(sentences, flatdict)
 	case "alternates":
