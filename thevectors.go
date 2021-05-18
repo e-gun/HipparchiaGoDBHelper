@@ -13,7 +13,8 @@
 // [f] find all of the parsing info relative to these words
 // [g] figure out which headwords to associate with the collection of words
 // [h] build the lemmatized bags of words ('unlemmatized' can skip [f] and [g]...)
-// [i] store the bags
+// [i] purge stopwords
+// [j] store the bags
 //
 // once you reach this point python can fetch the bags and then run "Word2Vec(bags, parameters, ...)"
 //
@@ -140,7 +141,6 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	sb.Reset()
 
 	logiflogging(fmt.Sprintf("unified text block built [B: %fs])", time.Now().Sub(start).Seconds()), loglevel, 4)
-	// fmt.Println(fmt.Sprintf(txt))
 
 	// [c] do some preliminary cleanups
 	// parsevectorsentences()
@@ -152,12 +152,8 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 
 	// [d] break the text into sentences and assemble []SentenceWithLocus
 
-	// split at more than just one kind of punctuation...
 	terminations := []string{".", "?", "!", "·", ";"}
 	s := recursivesplitter([]string{txt}, terminations, 0, len(terminations))
-
-	// the vanilla version...
-	// s := strings.Split(txt, ".")
 
 	var sentences []SentenceWithLocus
 	var first string
@@ -187,6 +183,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 
 	// unlemmatized bags of words customers have in fact reached their target as of now
 	if baggingmethod == "unlemmatized" {
+		sentences = dropstopwords(skipinflected, sentences)
 		kk := strings.Split(searchkey, "_")
 		resultkey := kk[0] + "_vectorresults"
 		loadthebags(resultkey, goroutines, sentences, redisclient)
@@ -197,10 +194,6 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 
 	// ex sentence: {line/lt0448w001/22  Belgae ab extremis Galliae finibus oriuntur, pertinent ad inferiorem partem fluminis Rheni, spectant in septentrionem et orientem solem}
-
-	//for i := 0; i < len(sentences); i++ {
-	//	fmt.Println(sentences[i])
-	//}
 
 	// [e] figure out all of the words used in the passage
 
@@ -216,10 +209,6 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 
 	logiflogging(fmt.Sprintf("found %d distinct words [E: %fs]", len(allwords), time.Now().Sub(start).Seconds()), loglevel, 4)
-
-	//for w := range allwords {
-	//	fmt.Printf("%s ", w)
-	//}
 
 	// [f] find all of the parsing info relative to these words
 
@@ -280,6 +269,8 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 
 	logiflogging(fmt.Sprintf("Pre-Bagging [F2: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
 
+	// [h] build the lemmatized bags of words
+
 	switch baggingmethod {
 	// see vectorparsingandbagging.go
 	case "flat":
@@ -293,12 +284,12 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 	logiflogging(fmt.Sprintf("Post-Bagging [F3: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
 
-	// [h] purge stopwords
+	// [i] purge stopwords
 	sentences = dropstopwords(skipheadwords, sentences)
 	sentences = dropstopwords(skipinflected, sentences)
 	logiflogging(fmt.Sprintf("Cleared stopwords [F4: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
 
-	// [i] store...
+	// [j] store...
 	kk := strings.Split(searchkey, "_")
 	resultkey := kk[0] + "_vectorresults"
 

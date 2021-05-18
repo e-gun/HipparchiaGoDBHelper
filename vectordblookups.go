@@ -37,49 +37,6 @@ func fetchdblinesdirectly(thedb string, thestart int, theend int, dbpool *pgxpoo
 	return dblines
 }
 
-func looptogetrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
-	// the slow but sure way...
-
-	latintest := regexp.MustCompile(`[a-z]`)
-	qtemplate := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE observed_form = $1"
-	var q string
-
-	foundmorph := make(map[string]DbMorphology)
-
-	for i := 0; i < len(wordlist); i++ {
-		if latintest.MatchString(wordlist[i]) {
-			q = fmt.Sprintf(qtemplate, "latin")
-		} else {
-			q = fmt.Sprintf(qtemplate, "greek")
-		}
-		foundrows, err := dbpool.Query(context.Background(), q, wordlist[i])
-		checkerror(err)
-		defer foundrows.Close()
-		for foundrows.Next() {
-			var thehit DbMorphology
-			err = foundrows.Scan(&thehit.Observed, &thehit.Xrefs, &thehit.PefixXrefs, &thehit.RawPossib)
-			checkerror(err)
-			thehit.UniqPossib = make(map[string]bool)
-			if _, t := foundmorph[thehit.Observed]; t {
-				// logiflogging(fmt.Sprintf("%s is already present; need to append these possibilites to the other possibilities", thehit.Observed), 0, 0)
-				newpos := updatesetofpossibilities(thehit.RawPossib, thehit.UniqPossib)
-				for p := range newpos {
-					if _, t := foundmorph[thehit.Observed].UniqPossib[p]; !t {
-						// logiflogging(fmt.Sprintf("appending to %s: %s", thehit.Observed, p), 0, 0)
-						foundmorph[thehit.Observed].UniqPossib[p] = true
-					}
-				}
-			} else {
-				thehit.UniqPossib = updatesetofpossibilities(thehit.RawPossib, thehit.UniqPossib)
-				foundmorph[thehit.Observed] = thehit
-			}
-		}
-	}
-	logiflogging(fmt.Sprintf("foundmorph contains %d", len(foundmorph)), 0, 0)
-
-	return foundmorph
-}
-
 func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
 	// run arraytogetrequiredmorphobjects once for each language
 	latintest := regexp.MustCompile(`[a-z]`)
@@ -209,6 +166,63 @@ func getpossiblemorph(o string, p string) MorphPossibility {
 	return mp
 }
 
+func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
+	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[%s]) words"
+	qt := "SELECT entry_name, total_count FROM dictionary_headword_wordcounts WHERE EXISTS " +
+		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = dictionary_headword_wordcounts.entry_name)"
+
+	rndid := strings.Replace(uuid.New().String(), "-", "", -1)
+
+	hw := make([]string, 0, len(headwordset))
+	for h := range headwordset {
+		hw = append(hw, h)
+	}
+
+	arr := strings.Join(hw, "', '")
+	arr = "'" + arr + "'"
+
+	tt = fmt.Sprintf(tt, rndid, arr)
+	_, err := dbpool.Exec(context.Background(), tt)
+	checkerror(err)
+
+	qt = fmt.Sprintf(qt, rndid)
+	foundrows, e := dbpool.Query(context.Background(), qt)
+	checkerror(e)
+
+	returnmap := make(map[string]int)
+	defer foundrows.Close()
+	for foundrows.Next() {
+		var thehit WeightedHeadword
+		err = foundrows.Scan(&thehit.Word, &thehit.Count)
+		if err != nil {
+			fmt.Println(err)
+		}
+		returnmap[thehit.Word] = thehit.Count
+	}
+
+	// don't kill off unfound terms
+	for i := range hw {
+		if _, t := returnmap[hw[i]]; t {
+			continue
+		} else {
+			returnmap[hw[i]] = 0
+		}
+	}
+
+	return returnmap
+}
+
+func parallelredisloader(resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
+	for i := 0; i < len(bags); i++ {
+		jsonhit, err := json.Marshal(bags[i])
+		checkerror(err)
+		redisclient.SAdd(resultkey, jsonhit)
+	}
+	// don't actually need to report the key because we know it...
+	// ch <- resultkey
+	wg.Done()
+}
+
 func loopfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
 	// the slow way: via a loop
 	hw := make([]string, 0, len(headwordset))
@@ -247,63 +261,45 @@ func loopfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) 
 	return returnmap
 }
 
-func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
-	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[%s]) words"
-	qt := "SELECT entry_name, total_count FROM dictionary_headword_wordcounts WHERE EXISTS " +
-		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = dictionary_headword_wordcounts.entry_name)"
+func looptogetrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
+	// the slow but sure way...
 
-	rndid := strings.Replace(uuid.New().String(), "-", "", -1)
+	latintest := regexp.MustCompile(`[a-z]`)
+	qtemplate := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE observed_form = $1"
+	var q string
 
-	hw := make([]string, 0, len(headwordset))
-	for h := range headwordset {
-		hw = append(hw, h)
-	}
+	foundmorph := make(map[string]DbMorphology)
 
-	arr := strings.Join(hw, "', '")
-	arr = "'" + arr + "'"
-
-	tt = fmt.Sprintf(tt, rndid, arr)
-	_, err := dbpool.Exec(context.Background(), tt)
-	checkerror(err)
-
-	qt = fmt.Sprintf(qt, rndid)
-	foundrows, e := dbpool.Query(context.Background(), qt)
-	checkerror(e)
-
-	returnmap := make(map[string]int)
-	defer foundrows.Close()
-	for foundrows.Next() {
-		var thehit WeightedHeadword
-		err = foundrows.Scan(&thehit.Word, &thehit.Count)
-		if err != nil {
-			fmt.Println(err)
-		}
-		returnmap[thehit.Word] = thehit.Count
-	}
-
-	//fmt.Println(fmt.Sprintf("tt: %s", tt))
-	//fmt.Println(fmt.Sprintf("qt: %s", qt))
-	fmt.Println(fmt.Sprintf("returnmap size: %d", len(returnmap)))
-
-	// don't kill off unfound terms
-	for i := range hw {
-		if _, t := returnmap[hw[i]]; t {
-			continue
+	for i := 0; i < len(wordlist); i++ {
+		if latintest.MatchString(wordlist[i]) {
+			q = fmt.Sprintf(qtemplate, "latin")
 		} else {
-			returnmap[hw[i]] = 0
+			q = fmt.Sprintf(qtemplate, "greek")
+		}
+		foundrows, err := dbpool.Query(context.Background(), q, wordlist[i])
+		checkerror(err)
+		defer foundrows.Close()
+		for foundrows.Next() {
+			var thehit DbMorphology
+			err = foundrows.Scan(&thehit.Observed, &thehit.Xrefs, &thehit.PefixXrefs, &thehit.RawPossib)
+			checkerror(err)
+			thehit.UniqPossib = make(map[string]bool)
+			if _, t := foundmorph[thehit.Observed]; t {
+				// logiflogging(fmt.Sprintf("%s is already present; need to append these possibilites to the other possibilities", thehit.Observed), 0, 0)
+				newpos := updatesetofpossibilities(thehit.RawPossib, thehit.UniqPossib)
+				for p := range newpos {
+					if _, t := foundmorph[thehit.Observed].UniqPossib[p]; !t {
+						// logiflogging(fmt.Sprintf("appending to %s: %s", thehit.Observed, p), 0, 0)
+						foundmorph[thehit.Observed].UniqPossib[p] = true
+					}
+				}
+			} else {
+				thehit.UniqPossib = updatesetofpossibilities(thehit.RawPossib, thehit.UniqPossib)
+				foundmorph[thehit.Observed] = thehit
+			}
 		}
 	}
+	logiflogging(fmt.Sprintf("foundmorph contains %d", len(foundmorph)), 0, 0)
 
-	return returnmap
-}
-
-func parallelredisloader(resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
-	for i := 0; i < len(bags); i++ {
-		jsonhit, err := json.Marshal(bags[i])
-		checkerror(err)
-		redisclient.SAdd(resultkey, jsonhit)
-	}
-	// don't actually need to report the key because we know it...
-	// ch <- resultkey
-	wg.Done()
+	return foundmorph
 }
