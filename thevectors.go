@@ -293,6 +293,12 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 	logiflogging(fmt.Sprintf("Post-Bagging [F3: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
 
+	// [h] purge stopwords
+	sentences = dropstopwords(skipheadwords, sentences)
+	sentences = dropstopwords(skipinflected, sentences)
+	logiflogging(fmt.Sprintf("Cleared stopwords [F4: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
+
+	// [i] store...
 	kk := strings.Split(searchkey, "_")
 	resultkey := kk[0] + "_vectorresults"
 

@@ -158,3 +158,33 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 
 	return bags
 }
+
+func dropstopwords(skipper string, bagsofwords []SentenceWithLocus) []SentenceWithLocus {
+	// set up the skiplist; then iterate through the bags returning new, clean bags
+	s := strings.Split(skipper, " ")
+	sm := make(map[string]bool)
+	for i := 0; i < len(s); i++ {
+		sm[s[i]] = true
+	}
+
+	for i := 0; i < len(s); i++ {
+		wl := strings.Split(bagsofwords[i].Sent, " ")
+		wl = stopworddropper(sm, wl)
+		bagsofwords[i].Sent = strings.Join(wl, " ")
+	}
+
+	return bagsofwords
+}
+
+func stopworddropper(stops map[string]bool, wordlist []string) []string {
+	// if word is in stops, drop the word
+	var returnlist []string
+	for i := 0; i < len(wordlist); i++ {
+		if _, t := stops[wordlist[i]]; t {
+			continue
+		} else {
+			returnlist = append(returnlist, wordlist[i])
+		}
+	}
+	return returnlist
+}
