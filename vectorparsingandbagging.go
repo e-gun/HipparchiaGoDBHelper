@@ -167,7 +167,7 @@ func dropstopwords(skipper string, bagsofwords []SentenceWithLocus) []SentenceWi
 		sm[s[i]] = true
 	}
 
-	for i := 0; i < len(s); i++ {
+	for i := 0; i < len(bagsofwords); i++ {
 		wl := strings.Split(bagsofwords[i].Sent, " ")
 		wl = stopworddropper(sm, wl)
 		bagsofwords[i].Sent = strings.Join(wl, " ")
