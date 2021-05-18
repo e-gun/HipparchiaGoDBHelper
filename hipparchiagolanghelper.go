@@ -54,13 +54,13 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.0.3"
+	version         = "1.0.4"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
 	testend         = 26
 	linelength      = 72
-	pollinginterval = 400 * time.Millisecond
+	pollinginterval = 333 * time.Millisecond
 )
 
 //

@@ -117,9 +117,6 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, dbpool *p
 
 	wordlist = append(wordlist, uppers...)
 
-	// better to use an array, but pgx is balking if you try to pass the array as $1 at dbpool.Exec()
-	// yet this seems perfectly // to fetchheadwordcounts()
-
 	// hipparchiaDB=# CREATE TEMPORARY TABLE ttw AS SELECT words AS w FROM unnest(ARRAY['dolor', 'amor', 'lusus']) words;
 	// hipparchiaDB=# SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM latin_morphology
 	//					WHERE EXISTS (SELECT 1 FROM ttw temptable WHERE temptable.w = latin_morphology.observed_form);
@@ -238,13 +235,6 @@ func loopfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) 
 	// don't kill off unfound terms
 
 	for i := range hw {
-		//if strings.Contains(hw[i], "ωκρ") {
-		//	fmt.Println(fmt.Sprintf("%s: %d", hw[i], returnmap[hw[i]]))
-		//}
-		//[debugging] ϲωκρατέω: 7426 [debugging]
-		//[debugging] Ϲωκράτηϲ: 13493 [debugging]
-		//[debugging] Ϲωκρατέω: 0 [debugging]
-
 		if _, t := returnmap[hw[i]]; t {
 			continue
 		} else {
@@ -254,31 +244,14 @@ func loopfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) 
 		}
 	}
 
-	// a problem remains: the text is lower-case, but you have upper-case items in your scoremap
-	// need lower the cases
-
-	//lcreturnmap := make(map[string]int)
-	//
-	//for i:= range returnmap {
-	//	if strings.ToLower(i) != i {
-	//		//fmt.Println(fmt.Sprintf("upper: %s", i))
-	//		//fmt.Println(fmt.Sprintf("lower: %s = %d", strings.ToLower(i), returnmap[i]))
-	//		if returnmap[i] > returnmap[strings.ToLower(i)] {
-	//			returnmap[strings.ToLower(i)] = returnmap[i]
-	//			delete(returnmap, i)
-	//		}
-	//	} else {
-	//		lcreturnmap[i] = returnmap[i]
-	//	}
-	//}
-
 	return returnmap
 }
 
 func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
-	tt := "CREATE TEMPORARY TABLE temporary_headwordlist_%s AS SELECT headwords AS hw FROM unnest(ARRAY[$1]) headwords"
+	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[%s]) words"
 	qt := "SELECT entry_name, total_count FROM dictionary_headword_wordcounts WHERE EXISTS " +
-		"(SELECT 1 FROM temporary_headwordlist_%s temptable WHERE temptable.hw = dictionary_headword_wordcounts.entry_name)"
+		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = dictionary_headword_wordcounts.entry_name)"
+
 	rndid := strings.Replace(uuid.New().String(), "-", "", -1)
 
 	hw := make([]string, 0, len(headwordset))
@@ -286,13 +259,15 @@ func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool)
 		hw = append(hw, h)
 	}
 
-	arr := strings.Join(hw, ", ")
+	arr := strings.Join(hw, "', '")
 	arr = "'" + arr + "'"
 
-	_, err := dbpool.Exec(context.Background(), fmt.Sprintf(tt, rndid), arr)
+	tt = fmt.Sprintf(tt, rndid, arr)
+	_, err := dbpool.Exec(context.Background(), tt)
 	checkerror(err)
 
-	foundrows, e := dbpool.Query(context.Background(), fmt.Sprintf(qt, rndid))
+	qt = fmt.Sprintf(qt, rndid)
+	foundrows, e := dbpool.Query(context.Background(), qt)
 	checkerror(e)
 
 	returnmap := make(map[string]int)
@@ -305,6 +280,10 @@ func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool)
 		}
 		returnmap[thehit.Word] = thehit.Count
 	}
+
+	//fmt.Println(fmt.Sprintf("tt: %s", tt))
+	//fmt.Println(fmt.Sprintf("qt: %s", qt))
+	fmt.Println(fmt.Sprintf("returnmap size: %d", len(returnmap)))
 
 	// don't kill off unfound terms
 	for i := range hw {
