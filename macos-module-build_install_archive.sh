@@ -2,16 +2,16 @@
 # attempt to fix the import problems that gopy leaves behind
 # you need gsed; "brew install gnu-sed"
 A="../HipparchiaGoBinaries/module"
-H="${HOME}/hipparchia_venv/HipparchiaServer/server/golangmodule/"
+H="${HOME}/hipparchia_venv/HipparchiaServer/server/externalmodule/"
 
 # toggle build style if needed
 gsed -i "s/package main/package hipparchiagolangsearching/" *.go
 
 gopy build -output=golangmodule -vm=`which python3` $GOPATH/src/github.com/e-gun/HipparchiaGoDBHelper/
 
-gsed -i "s/import _hipparchiagolangsearching/from server.golangmodule import _hipparchiagolangsearching/" golangmodule/go.py
-gsed -i "s/import _hipparchiagolangsearching/from server.golangmodule import _hipparchiagolangsearching/" golangmodule/hipparchiagolangsearching.py
-gsed -i "s/import go/from server.golangmodule import go/" golangmodule/hipparchiagolangsearching.py
+gsed -i "s/import _hipparchiagolangsearching/from server.externalmodule import _hipparchiagolangsearching/" golangmodule/go.py
+gsed -i "s/import _hipparchiagolangsearching/from server.externalmodule import _hipparchiagolangsearching/" golangmodule/hipparchiagolangsearching.py
+gsed -i "s/import go/from server.externalmodule import go/" golangmodule/hipparchiagolangsearching.py
 
 cp -rpv ./golangmodule/* ${H}
 V=`grep version hipparchiagolanghelper.go | grep '= "' | cut -d '"' -f 2`

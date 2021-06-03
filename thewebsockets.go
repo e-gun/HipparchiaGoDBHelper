@@ -130,7 +130,12 @@ func retrievepollingdata(searchid string, rediskeys [8]string, loglevel int, rc 
 }
 
 func typeconvertpollingdata(searchid string, rediskeys [8]string, redisvals [8]string) CompositePollingData {
-	// everything arrives as a string; but that is not right
+	// everything arrives as a string; but that is not technically right
+	// *but* since you are going back to JSON, you can in practice skip getting the types right inside of golang
+	// the rust version just grabs the data; hashmaps it with the right keys; then jsonifies it
+	// the equivalent here would be to just let CompositePollingData have String as its type in every field, i.e.,
+	// all of the reflect tests could be skipped
+
 	// https://stackoverflow.com/questions/6395076/using-reflect-how-do-you-set-the-value-of-a-struct-field/6396678#6396678
 	// https://samwize.com/2015/03/20/how-to-use-reflect-to-set-a-struct-field/
 

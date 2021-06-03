@@ -14,7 +14,7 @@ mv ${O} ${P}
 # e.g. Hipparchia Golang Helper CLI Debugging Interface (v.0.0.1)
 V=$(./${P} -v | cut -d" " -f 7 | cut -d "(" -f 2 | cut -d ")" -f 1)
 U=$(uname)
-H="${HOME}/hipparchia_venv/HipparchiaServer/server/golangmodule/"
+H="${HOME}/hipparchia_venv/HipparchiaServer/server/externalbinaries/"
 cp ${P} ${H}
 cp ${P} ${T}/${P}-$U-${V}
 rm ${T}/${P}-${U}-${V}.bz2
