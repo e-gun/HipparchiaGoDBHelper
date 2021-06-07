@@ -99,21 +99,35 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workers i
 
 	// https://golangbyexample.com/return-value-goroutine-go/
 
+	// https://stackoverflow.com/questions/46010836/using-goroutines-to-process-values-and-gather-results-into-a-slice
+	// see the comments of Paul Hankin
+
 	var wg sync.WaitGroup
-	var collectedmorphology []map[string]DbMorphology
+	var collector []map[string]DbMorphology
+	channeling := make(chan map[string]DbMorphology, workers)
+
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
-		r := make(chan map[string]DbMorphology)
-		go arraytmorphologyworker(wordmap[i], uselang, i, r, dbpool, &wg)
-		v := <-r
-		// fmt.Printf("#%d found %d items\n", i, len(v))
-		collectedmorphology = append(collectedmorphology, v)
-		close(r)
+		// i will be captured if sent into the function
+		j := i
+		go func(wordlist []string, uselang string, workerid int, dbpool *pgxpool.Pool) {
+			defer wg.Done()
+			channeling <- arraytmorphologyworker(wordmap[j], uselang, j, dbpool)
+		}(wordmap[i], uselang, i, dbpool)
 	}
-	wg.Wait()
+
+	go func() {
+		wg.Wait()
+		close(channeling)
+	}()
+
 	// merge the results
+	for c := range channeling {
+		collector = append(collector, c)
+	}
+
 	foundmorph := make(map[string]DbMorphology)
-	for _, mmap := range collectedmorphology {
+	for _, mmap := range collector {
 		for w := range mmap {
 			foundmorph[w] = mmap[w]
 		}
@@ -122,17 +136,27 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workers i
 	return foundmorph
 }
 
-func arraytmorphologyworker(wordlist []string, uselang string, workerid int, resultchannel chan map[string]DbMorphology, dbpool *pgxpool.Pool, wg *sync.WaitGroup) {
-	defer wg.Done()
+func arraytmorphologyworker(wordlist []string, uselang string, workerid int, dbpool *pgxpool.Pool) map[string]DbMorphology {
+
 	// logiflogging(fmt.Sprintf("arraytmorphologyworker %d was sent %d words", workerid, len(wordlist)), 0, 0)
+
+	// make sure that "0" comes in last so you can watch the parallelism
+	//if workerid == 0 {
+	//	time.Sleep(pollinginterval)
+	//	time.Sleep(pollinginterval)
+	//}
 
 	// hipparchiaDB=# CREATE TEMPORARY TABLE ttw AS SELECT words AS w FROM unnest(ARRAY['dolor', 'amor', 'lusus']) words;
 	// hipparchiaDB=# SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM latin_morphology
 	//					WHERE EXISTS (SELECT 1 FROM ttw temptable WHERE temptable.w = latin_morphology.observed_form);
+
 	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[%s]) words"
 	qt := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE EXISTS " +
 		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = %s_morphology.observed_form)"
+
+	// note that you can get uuid collisions when the routines go too fast; adding "uselang" and "workerid" will stop that
 	rndid := strings.Replace(uuid.New().String(), "-", "", -1)
+	rndid = fmt.Sprintf("%s_%s_mw_%d", rndid, uselang, workerid)
 	arr := strings.Join(wordlist, "', '")
 	arr = "'" + arr + "'"
 	tt = fmt.Sprintf(tt, rndid, arr)
@@ -165,7 +189,8 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, res
 		}
 	}
 
-	resultchannel <- foundmorph
+	// logiflogging(fmt.Sprintf("arraytmorphologyworker %d found %d items", workerid, len(foundmorph)), 0, 0)
+	return foundmorph
 }
 
 func updatesetofpossibilities(p string, known map[string]bool) map[string]bool {

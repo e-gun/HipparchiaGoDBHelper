@@ -72,7 +72,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	dblines := make(map[int]DbWorkline)
 
 	if searchkey == "" {
-		logiflogging(fmt.Sprintf("No redis key; gathering lines with a direct CLI PostgreSQL query", p.DBName), loglevel, 1)
+		logiflogging(fmt.Sprintf("No redis key; gathering lines with a direct CLI PostgreSQL query"), loglevel, 1)
 		dblines = fetchdblinesdirectly(thedb, thestart, theend, dbpool)
 	} else {
 		count := 0

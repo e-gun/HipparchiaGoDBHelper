@@ -93,27 +93,22 @@ finding the morphology takes less time than building the morph dict...
 
 parallel loading of redis speeds things up...
 
-date && ./HipparchiaGoDBHelper -sv -l 5 -svdb lt0474 -svs 4 -sve 140000 -k "" -p ${L} && date
-Fri May  7 16:44:25 EDT 2021
-[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.0.1.6) [loglevel=5]
+date && ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" -t 5 -p ${L} && date
+Mon Jun  7 17:38:01 EDT 2021
+[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.0.10) [loglevel=3]
+[HGH] Bagger Module Launched
 [HGH] Seeking to build *winnertakesall* bags of words
 [HGH] Connected to redis
 [HGH] Connected to hipparchiaDB on PostgreSQL
-[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query%!(EXTRA string=hipparchiaDB)
-[HGH] unified text block built [B: 0.285670s])
-[HGH] preliminary cleanups complete [C: 0.360582s])
-[HGH] found 79683 sentences [D: 1.409095s]
-[HGH] found 79975 distinct words [E: 1.469624s]
-[HGH] foundmorph contains 65693 members
-[HGH] Got morphology [F: 2.764460s]
-[HGH] Build morphdict [F1: 5.540167s]
-[HGH] Pre-Bagging [F2: 5.574815s]
-[HGH] Post-Bagging [F3: 5.820767s]
-(0) sentences[0 : 15936]
-(1) sentences[15936 : 31872]
-(2) sentences[31872 : 47808]
-(3) sentences[47808 : 63744]
-(4) sentences[63744 : 79680]
-[HGH] Reached result @ 7.345995s]
-bags have been stored at _vectorresultsFri May  7 16:44:32 EDT 2021
-
+[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
+[HGH] 139997 lines acquired [A: 0.214960s])
+[HGH] unified text block built [B: 0.290444s])
+[HGH] preliminary cleanups complete [C: 0.367368s])
+[HGH] found 79683 sentences [D: 1.442941s]
+[HGH] found 79991 distinct words [E: 1.517810s]
+[HGH] Got morphology for 66334 terms [F: 2.229176s]
+[HGH] Built morphmap for 66334 terms [G: 2.942428s]
+[HGH] Finished bagging 79683 bags [H: 3.318505s]
+[HGH] Cleared stopwords [I: 3.446793s]
+[HGH] Finished loading [J: 5.156378s]
+bags have been stored at _vectorresultsMon Jun  7 17:38:06 EDT 2021
