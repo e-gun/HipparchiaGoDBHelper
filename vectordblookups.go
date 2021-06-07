@@ -37,7 +37,7 @@ func fetchdblinesdirectly(thedb string, thestart int, theend int, dbpool *pgxpoo
 	return dblines
 }
 
-func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
+func getrequiredmorphobjects(wordlist []string, workers int, dbpool *pgxpool.Pool) map[string]DbMorphology {
 	// run arraytogetrequiredmorphobjects once for each language
 	latintest := regexp.MustCompile(`[a-z]`)
 	var latinwords []string
@@ -50,8 +50,8 @@ func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string
 		}
 	}
 
-	lt := arraytogetrequiredmorphobjects(latinwords, "latin", dbpool)
-	gk := arraytogetrequiredmorphobjects(greekwords, "greek", dbpool)
+	lt := arraytogetrequiredmorphobjects(latinwords, "latin", workers, dbpool)
+	gk := arraytogetrequiredmorphobjects(greekwords, "greek", workers, dbpool)
 
 	mo := make(map[string]DbMorphology)
 	for k, v := range gk {
@@ -65,7 +65,10 @@ func getrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string
 	return mo
 }
 
-func arraytogetrequiredmorphobjects(wordlist []string, uselang string, dbpool *pgxpool.Pool) map[string]DbMorphology {
+func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workers int, dbpool *pgxpool.Pool) map[string]DbMorphology {
+	// NB: this goroutine version not in fact faster with Cicero than doing it without goroutines as one giant array
+	// but the implementation pattern is likely useful for some place where it will make a difference
+
 	// look for the upper case matches too: Ϲωκράτηϲ and not just ϲωκρατέω (!)
 	var uppers []string
 	for i := 0; i < len(wordlist); i++ {
@@ -73,6 +76,55 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, dbpool *p
 	}
 
 	wordlist = append(wordlist, uppers...)
+
+	totalwork := len(wordlist)
+	chunksize := totalwork / workers
+	leftover := totalwork % workers
+	wordmap := make(map[int][]string, workers)
+
+	if totalwork <= workers {
+		wordmap[0] = wordlist
+	} else {
+		thestart := 0
+		for i := 0; i < workers; i++ {
+			wordmap[i] = wordlist[thestart : thestart+chunksize]
+			thestart = thestart + chunksize
+		}
+
+		// leave no sentence behind!
+		if leftover > 0 {
+			wordmap[workers-1] = append(wordmap[workers-1], wordlist[totalwork-leftover-1:totalwork-1]...)
+		}
+	}
+
+	// https://golangbyexample.com/return-value-goroutine-go/
+
+	var wg sync.WaitGroup
+	var collectedmorphology []map[string]DbMorphology
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		r := make(chan map[string]DbMorphology)
+		go arraytmorphologyworker(wordmap[i], uselang, i, r, dbpool, &wg)
+		v := <-r
+		// fmt.Printf("#%d found %d items\n", i, len(v))
+		collectedmorphology = append(collectedmorphology, v)
+		close(r)
+	}
+	wg.Wait()
+	// merge the results
+	foundmorph := make(map[string]DbMorphology)
+	for _, mmap := range collectedmorphology {
+		for w := range mmap {
+			foundmorph[w] = mmap[w]
+		}
+	}
+
+	return foundmorph
+}
+
+func arraytmorphologyworker(wordlist []string, uselang string, workerid int, resultchannel chan map[string]DbMorphology, dbpool *pgxpool.Pool, wg *sync.WaitGroup) {
+	defer wg.Done()
+	// logiflogging(fmt.Sprintf("arraytmorphologyworker %d was sent %d words", workerid, len(wordlist)), 0, 0)
 
 	// hipparchiaDB=# CREATE TEMPORARY TABLE ttw AS SELECT words AS w FROM unnest(ARRAY['dolor', 'amor', 'lusus']) words;
 	// hipparchiaDB=# SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM latin_morphology
@@ -113,7 +165,7 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, dbpool *p
 		}
 	}
 
-	return foundmorph
+	resultchannel <- foundmorph
 }
 
 func updatesetofpossibilities(p string, known map[string]bool) map[string]bool {
@@ -128,12 +180,9 @@ func updatesetofpossibilities(p string, known map[string]bool) map[string]bool {
 	return known
 }
 
-func getpossiblemorph(o string, p string) MorphPossibility {
-	// this still only does a single possibility...
+func getpossiblemorph(o string, p string, pf *regexp.Regexp) MorphPossibility {
+	// pf := regexp.MustCompile(`(<possibility_(\d{1,2})>)(.*?)<xref_value>(.*?)</xref_value><xref_kind>(.*?)</xref_kind>(.*?)</possibility_\d{1,2}>`)
 
-	// see the example at https://golang.org/pkg/regexp/
-	// this regex matches the python for good/ill...
-	pf := regexp.MustCompile(`(<possibility_(\d{1,2})>)(.*?)<xref_value>(.*?)</xref_value><xref_kind>(.*?)</xref_kind>(.*?)</possibility_\d{1,2}>`)
 	m := pf.FindStringSubmatchIndex(p)
 
 	// SAMPLE
@@ -147,6 +196,8 @@ func getpossiblemorph(o string, p string) MorphPossibility {
 	// [8] 42 49: 8636495
 	//[10] 73 74: 9
 	//[12] 86 195: <transl>A. pretty; B. every thing beautiful; A. Gallant; B. good</transl><analysis>masc nom/voc pl</analysis>
+
+	// note that in [6] you need to take the second half after the comma: "bellus" and not "bellī, bellus": s := strings.Split(x, ",")
 
 	// should include a test to make sure len(m) will let us do the following? but m is nil if it won't fit the template?
 	var mp MorphPossibility

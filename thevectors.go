@@ -223,8 +223,8 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 
 	var mo map[string]DbMorphology
-	mo = getrequiredmorphobjects(keys, dbpool)
-	logiflogging(fmt.Sprintf("Got morphology [F: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
+	mo = getrequiredmorphobjects(keys, goroutines, dbpool)
+	logiflogging(fmt.Sprintf("Got morphology for %d terms [F: %fs]", len(mo), time.Now().Sub(start).Seconds()), loglevel, 3)
 
 	// [g] figure out which headwords to associate with the collection of words
 
@@ -235,11 +235,18 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	// {'θεῶν': {'θεόϲ', 'θέα', 'θεάω', 'θεά'}, 'πώ': {'πω'}, 'πολλά': {'πολύϲ'}, 'πατήρ': {'πατήρ'}, ... }
 
 	morphdict := make(map[string]map[string]bool)
+
+	// see the example at https://golang.org/pkg/regexp/
+	// this regex matches the python for good/ill...
+	// avoid looping the compilation and save big
+	// [HGH] Built morphmap for 54958 terms [G: 4.822822s] vs [HGH] Built morphmap for 54958 terms [G: 2.967299s]
+	pf := regexp.MustCompile(`(<possibility_(\d{1,2})>)(.*?)<xref_value>(.*?)</xref_value><xref_kind>(.*?)</xref_kind>(.*?)</possibility_\d{1,2}>`)
+
 	for m := range mo {
 		// unpack the unique possibilities
 		pp := make([]MorphPossibility, 0, len(mo[m].UniqPossib))
 		for k := range mo[m].UniqPossib {
-			pp = append(pp, getpossiblemorph(m, k))
+			pp = append(pp, getpossiblemorph(m, k, pf))
 		}
 		// add them to the collection of possibilities or generate a new slot for them in the collection
 		for i := 0; i < len(pp); i++ {
@@ -254,9 +261,6 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 		}
 	}
 
-	// the above is interestingly slow... not super-slow, but still relatively slow: 3s in Cicero
-	logiflogging(fmt.Sprintf("Build morphdict [F1: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
-
 	// no need for the "bool" any longer; demap things
 	flatdict := make(map[string][]string, len(morphdict))
 	for i := range morphdict {
@@ -267,7 +271,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 		flatdict[i] = thekeys
 	}
 
-	logiflogging(fmt.Sprintf("Pre-Bagging [F2: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
+	logiflogging(fmt.Sprintf("Built morphmap for %d terms [G: %fs]", len(flatdict), time.Now().Sub(start).Seconds()), loglevel, 5)
 
 	// [h] build the lemmatized bags of words
 
@@ -282,12 +286,12 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	default:
 		logiflogging(fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", baggingmethod), loglevel, 0)
 	}
-	logiflogging(fmt.Sprintf("Post-Bagging [F3: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
+	logiflogging(fmt.Sprintf("Finished bagging %d bags [H: %fs]", len(sentences), time.Now().Sub(start).Seconds()), loglevel, 5)
 
 	// [i] purge stopwords
 	sentences = dropstopwords(skipheadwords, sentences)
 	sentences = dropstopwords(skipinflected, sentences)
-	logiflogging(fmt.Sprintf("Cleared stopwords [F4: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
+	logiflogging(fmt.Sprintf("Cleared stopwords [I: %fs]", time.Now().Sub(start).Seconds()), loglevel, 5)
 
 	// [j] store...
 	kk := strings.Split(searchkey, "_")
@@ -295,7 +299,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 
 	loadthebags(resultkey, goroutines, sentences, redisclient)
 
-	logiflogging(fmt.Sprintf("Reached result @ %fs]", time.Now().Sub(start).Seconds()), loglevel, 1)
+	logiflogging(fmt.Sprintf("Finished loading [J: %fs]", time.Now().Sub(start).Seconds()), loglevel, 1)
 	return resultkey
 }
 
