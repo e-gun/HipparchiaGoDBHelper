@@ -214,10 +214,12 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, tri
 		}
 	}
 
-	tt = "DROP TABLE IF EXISTS ttw_%s"
-	tt = fmt.Sprintf(tt, rndid)
-	_, ee := dbpool.Exec(context.Background(), tt)
-	checkerror(ee)
+	// the next is not needed and does not fix the error documented above...
+
+	//tt = "DROP TABLE IF EXISTS ttw_%s"
+	//tt = fmt.Sprintf(tt, rndid)
+	//_, ee := dbpool.Exec(context.Background(), tt)
+	//checkerror(ee)
 
 	// logiflogging(fmt.Sprintf("arraytmorphologyworker %d found %d items", workerid, len(foundmorph)), 0, 0)
 	return foundmorph
