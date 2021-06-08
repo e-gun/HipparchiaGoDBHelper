@@ -5,7 +5,7 @@
 # toggle build style if needed
 gsed -i "s/package hipparchiagolangsearching/package main/" *.go
 
-go build
+go build -ldflags "-s -w"
 O="HipparchiaGoDBHelper"
 #P="golanggrabber-cli"
 P="HipparchiaGoDBHelper"

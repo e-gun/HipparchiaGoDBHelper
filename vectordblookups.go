@@ -330,6 +330,8 @@ func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocu
 	//	time.Sleep(pollinginterval)
 	//}
 
+	// it is faster to pass a client here than it is to fetch a new one...
+
 	for i := 0; i < len(bags); i++ {
 		jsonhit, err := json.Marshal(bags[i])
 		checkerror(err)
