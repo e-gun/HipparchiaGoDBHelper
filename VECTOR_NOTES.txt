@@ -12,23 +12,33 @@ go get github.com/go-python/gopy
 gsed -i "s/package main/package hipparchiagolangsearching/" *.go
 rm -rf ./golangmodule/ && gopy build -output=golangmodule -vm=`which python3` $GOPATH/src/github.com/e-gun/HipparchiaGoDBHelper/
 
-import hipparchiagolangsearching as gs
+
+// hipparchia_venv/HipparchiaServer/ % python3
+
+import server.externalmodule.hipparchiagolangsearching as gs
 r = gs.NewRedisLogin('localhost:6379', '', 0)
 p = gs.NewPostgresLogin('localhost', 5432, 'hippa_rd', 'MYPASSWORD', 'hipparchiaDB')
 b = gs.HipparchiaBagger
-b('x', 'winnertakesall', 5, 'lt0448', 1, 26, 3, r, p)
+b('x', 'winnertakesall', 5, 'lt0448', 1, 26, 3, '', '', r, p)
 
 
 output:
 
->>> b('x', 'winnertakesall', 5, 'lt0448', 1, 26, 3, r, p)
+>>> b('x', 'winnertakesall', 5, 'lt0448', 1, 26, 3, '', '', r, p)
+[HGH] Bagger Module Launched
 [HGH] Seeking to build *winnertakesall* bags of words
 [HGH] Connected to redis
 [HGH] Connected to hipparchiaDB on PostgreSQL
-[HGH] found 1 sentences [D: 0.012686s]
-[HGH] foundmorph contains 0 members
-[HGH] Got morphology [F: 0.023864s]
-[HGH] Reached result @ 0.028933s]
+[HGH] 0 lines acquired [A: 0.068556s])
+[HGH] unified text block built [B: 0.068595s])
+[HGH] preliminary cleanups complete [C: 0.068682s])
+[HGH] found 1 sentences [D: 0.068716s]
+[HGH] found 1 distinct words [E: 0.068722s]
+[HGH] Got morphology for 0 terms [F: 0.112334s]
+[HGH] Built morphmap for 0 terms [G: 0.112439s]
+[HGH] Finished bagging 1 bags [H: 0.112450s]
+[HGH] Cleared stopwords [I: 0.112452s]
+[HGH] Finished loading [J: 0.113161s]
 'x_vectorresults'
 
 
@@ -112,3 +122,24 @@ Mon Jun  7 17:38:01 EDT 2021
 [HGH] Cleared stopwords [I: 3.446793s]
 [HGH] Finished loading [J: 5.156378s]
 bags have been stored at _vectorresultsMon Jun  7 17:38:06 EDT 2021
+
+
+date && ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" -t 5 -p ${L} && date
+Tue Jun  8 17:19:00 EDT 2021
+[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.1.0) [loglevel=3]
+[HGH] Bagger Module Launched
+[HGH] Seeking to build *winnertakesall* bags of words
+[HGH] Connected to redis
+[HGH] Connected to hipparchiaDB on PostgreSQL
+[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
+[HGH] 139997 lines acquired [A: 0.259595s])
+[HGH] unified text block built [B: 0.340560s])
+[HGH] preliminary cleanups complete [C: 0.479841s])
+[HGH] found 68790 sentences [D: 1.488973s]
+[HGH] found 80125 distinct words [E: 1.550323s]
+[HGH] Got morphology for 73819 terms [F: 2.381482s]
+[HGH] Built morphmap for 73819 terms [G: 3.167314s]
+[HGH] Finished bagging 68790 bags [H: 3.547959s]
+[HGH] Cleared stopwords [I: 3.683518s]
+[HGH] Finished loading [J: 4.922990s]
+bags have been stored at _vectorresultsTue Jun  8 17:19:05 EDT 2021

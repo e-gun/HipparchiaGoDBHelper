@@ -36,7 +36,9 @@ import (
 
 //HipparchiaBagger: Take a key; grab lines; bag them; store them
 func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, thedb string, thestart int, theend int,
-	loglevel int, hwd string, infl string, r RedisLogin, p PostgresLogin) string {
+	loglevel int, headwordstoskip string, inflectedtoskip string, r RedisLogin, p PostgresLogin) string {
+	// this does not work at the moment if called as a python module
+	// but HipparchiaServer does not know how to call it either...
 
 	logiflogging(fmt.Sprintf("Bagger Module Launched"), loglevel, 1)
 	start := time.Now()
@@ -178,7 +180,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 
 	// unlemmatized bags of words customers have in fact reached their target as of now
 	if baggingmethod == "unlemmatized" {
-		sentences = dropstopwords(infl, sentences)
+		sentences = dropstopwords(inflectedtoskip, sentences)
 		kk := strings.Split(searchkey, "_")
 		resultkey := kk[0] + "_vectorresults"
 		loadthebags(resultkey, goroutines, sentences, redisclient)
@@ -284,17 +286,17 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	logiflogging(fmt.Sprintf("Finished bagging %d bags [H: %fs]", len(sentences), time.Now().Sub(start).Seconds()), loglevel, 3)
 
 	// [i] purge stopwords
-	sentences = dropstopwords(hwd, sentences)
-	sentences = dropstopwords(infl, sentences)
+	sentences = dropstopwords(headwordstoskip, sentences)
+	sentences = dropstopwords(inflectedtoskip, sentences)
 	logiflogging(fmt.Sprintf("Cleared stopwords [I: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
 
 	// [j] store...
 	kk := strings.Split(searchkey, "_")
 	resultkey := kk[0] + "_vectorresults"
 
-	for i := 0; i < 5; i++ {
-		logiflogging(fmt.Sprintf("b #%d: %s", i, sentences[i]), loglevel, 0)
-	}
+	//for i := 0; i < 5; i++ {
+	//	logiflogging(fmt.Sprintf("b #%d: %s", i, sentences[i]), loglevel, 5)
+	//}
 
 	loadthebags(resultkey, goroutines, sentences, redisclient)
 
