@@ -163,19 +163,21 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, tri
 
 	foundrows, e := dbpool.Query(context.Background(), fmt.Sprintf(qt, uselang, rndid, uselang))
 	// stderr=b'panic: ERROR: relation "ttw_c27067420c144eb2972034b53e77bb58_greek_mw_2" does not exist (SQLSTATE 42P01)
+	// this error emerged when we moved over to goroutines
 	// this only happens fairly deep into a vectorbot run
 	// you never see a single error: always 2-4 dying on top of one another
-	// some sort of race...
+	// some sort of race inside the dbpool...?
+	// increasing MaxConns and/or MinConns is not the solution...
 	if e != nil {
 		// almost never see trial #2 & never saw #3
 		trialnumber += 1
 		// logiflogging(fmt.Sprintf("%s failed to create a temptable [trial #%d]", rndid, trialnumber), 0, 0)
-		if trialnumber > 3 {
+		if trialnumber > maxtrials {
 			logiflogging(fmt.Sprintf("arraytmorphologyworker worker#%d exhausted its tries to create a temptable [trial #%d]", workerid, trialnumber), 0, 0)
 			logiflogging(fmt.Sprintf("your results will be INVALID: a fraction of your words were just zapped", workerid, trialnumber), 0, 0)
 			return make(map[string]DbMorphology)
 		} else {
-			// the following makes no difference...
+			// the following makes no difference: but it maybe shows how a Begin that gave a "tx" could be used above...
 			// https://gowalker.org/github.com/jackc/pgx
 			//tx, err := dbpool.Begin(context.Background())
 			//if err != nil {
@@ -185,6 +187,7 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, tri
 			//if e != nil {
 			//	checkerror(e)
 			//}
+			// logiflogging(fmt.Sprintf("TotalConns of MaxConns: %d / %d", dbpool.Stat().TotalConns(), dbpool.Stat().MaxConns()), 0, 0)
 			return arraytmorphologyworker(wordlist, uselang, workerid, trialnumber, dbpool)
 		}
 	}

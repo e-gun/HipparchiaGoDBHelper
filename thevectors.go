@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"github.com/go-redis/redis"
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"os"
 	"regexp"
 	"strings"
@@ -43,9 +42,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	start := time.Now()
 	logiflogging(fmt.Sprintf("Seeking to build *%s* bags of words", baggingmethod), loglevel, 2)
 
-	redisclient := redis.NewClient(&redis.Options{Addr: r.Addr, Password: r.Password, DB: r.DB})
-	_, err := redisclient.Ping().Result()
-	checkerror(err)
+	redisclient := grabredisconnection(r)
 	defer redisclient.Close()
 	logiflogging(fmt.Sprintf("Connected to redis"), loglevel, 2)
 
@@ -53,15 +50,8 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	redisclient.Set(searchkey+"_poolofwork", -1, redisexpiration)
 	redisclient.Set(searchkey+"_hitcount", 0, redisexpiration)
 
-	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", p.User, p.Pass, p.Host, p.Port, p.DBName)
-	dbpool, err := pgxpool.Connect(context.Background(), url)
-	if err != nil {
-		logiflogging(fmt.Sprintf("Could not connect to PostgreSQL via %s", url), loglevel, 0)
-		panic(err)
-	}
-
+	dbpool := grabpgsqlconnection(p, goroutines, loglevel)
 	defer dbpool.Close()
-	logiflogging(fmt.Sprintf("Connected to %s on PostgreSQL", p.DBName), loglevel, 2)
 
 	// [a] grab the db lines
 	// we do this by copying the code inside of grabber but just cut out the storage bits: not DRY, but...

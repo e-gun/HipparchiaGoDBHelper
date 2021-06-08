@@ -59,7 +59,7 @@ func StartHipparchiaPollWebsocket(port int, loglevel int, failthreshold int, sav
 }
 
 func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving int, rl RedisLogin, m *melody.Melody) {
-	redisclient := redis.NewClient(&redis.Options{Addr: rl.Addr, Password: rl.Password, DB: rl.DB})
+	redisclient := grabredisconnection(rl)
 	defer redisclient.Close()
 
 	// note that these are lower case inside of redis, but they get reported as upper-case

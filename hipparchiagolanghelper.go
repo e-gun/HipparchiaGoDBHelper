@@ -43,9 +43,12 @@ package main
 
 import (
 	"C"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/go-redis/redis"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"os"
 	"time"
 )
@@ -54,13 +57,14 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.0.11"
+	version         = "1.0.12"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
 	testend         = 26
 	linelength      = 72
 	pollinginterval = 333 * time.Millisecond
+	maxtrials       = 3
 )
 
 //
@@ -216,6 +220,45 @@ func decodepsqllogin(psqllogininfo []byte) PostgresLogin {
 		panic(err)
 	}
 	return ps
+}
+
+//
+// DBCONNECTIONS
+//
+
+func grabredisconnection(r RedisLogin) *redis.Client {
+	redisclient := redis.NewClient(&redis.Options{Addr: r.Addr, Password: r.Password, DB: r.DB})
+	_, err := redisclient.Ping().Result()
+	checkerror(err)
+	return redisclient
+}
+
+func grabpgsqlconnection(p PostgresLogin, goroutines int, loglevel int) *pgxpool.Pool {
+
+	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", p.User, p.Pass, p.Host, p.Port, p.DBName)
+
+	config, oops := pgxpool.ParseConfig(url)
+	if oops != nil {
+		logiflogging(fmt.Sprintf("Could not execute pgxpool.ParseConfig(url) via %s", url), loglevel, 0)
+		panic(oops)
+	}
+
+	config.ConnConfig.PreferSimpleProtocol = true
+	config.MaxConns = int32((goroutines + 2) * 2)
+	config.MinConns = int32(goroutines + 2)
+
+	// the boring way if you don't want to go via pgxpool.ParseConfig(url)
+	// dbpool, err := pgxpool.Connect(context.Background(), url)
+	dbpool, err := pgxpool.ConnectConfig(context.Background(), config)
+
+	if err != nil {
+		logiflogging(fmt.Sprintf("Could not connect to PostgreSQL via %s", url), loglevel, 0)
+		panic(err)
+	}
+
+	logiflogging(fmt.Sprintf("Connected to %s on PostgreSQL", p.DBName), loglevel, 2)
+
+	return dbpool
 }
 
 //

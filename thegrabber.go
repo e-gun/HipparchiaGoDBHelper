@@ -17,9 +17,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-redis/redis"
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"runtime"
 	"sync"
 )
@@ -50,18 +48,18 @@ func grabber(clientnumber int, hitcap int64, searchkey string, loglevel int, r R
 	defer awaiting.Done()
 	logiflogging(fmt.Sprintf("Hello from grabber %d", clientnumber), loglevel, 3)
 
-	redisclient := redis.NewClient(&redis.Options{Addr: r.Addr, Password: r.Password, DB: r.DB})
-	_, err := redisclient.Ping().Result()
-	checkerror(err)
+	redisclient := grabredisconnection(r)
 	defer redisclient.Close()
 	logiflogging(fmt.Sprintf("grabber #%d connected to redis", clientnumber), loglevel, 2)
 
-	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", p.User, p.Pass, p.Host, p.Port, p.DBName)
-	dbpool, err := pgxpool.Connect(context.Background(), url)
-	if err != nil {
-		logiflogging(fmt.Sprintf("Could not connect to PostgreSQL via %s", url), loglevel, 0)
-		panic(err)
-	}
+	//url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", p.User, p.Pass, p.Host, p.Port, p.DBName)
+	//dbpool, err := pgxpool.Connect(context.Background(), url)
+	//if err != nil {
+	//	logiflogging(fmt.Sprintf("Could not connect to PostgreSQL via %s", url), loglevel, 0)
+	//	panic(err)
+	//}
+
+	dbpool := grabpgsqlconnection(p, 1, loglevel)
 	defer dbpool.Close()
 	logiflogging(fmt.Sprintf("grabber #%d Connected to %s on PostgreSQL", clientnumber, p.DBName), loglevel, 2)
 
@@ -134,7 +132,7 @@ func grabber(clientnumber int, hitcap int64, searchkey string, loglevel int, r R
 }
 
 func recordinitialsizeofworkpile(k string, loglevel int, rl RedisLogin) {
-	redisclient := redis.NewClient(&redis.Options{Addr: rl.Addr, Password: rl.Password, DB: rl.DB})
+	redisclient := grabredisconnection(rl)
 	defer redisclient.Close()
 	remain, err := redisclient.SCard(k).Result()
 	checkerror(err)
@@ -143,7 +141,7 @@ func recordinitialsizeofworkpile(k string, loglevel int, rl RedisLogin) {
 }
 
 func fetchfinalnumberofresults(k string, rl RedisLogin) int64 {
-	redisclient := redis.NewClient(&redis.Options{Addr: rl.Addr, Password: rl.Password, DB: rl.DB})
+	redisclient := grabredisconnection(rl)
 	defer redisclient.Close()
 	hits, err := redisclient.SCard(k + "_results").Result()
 	checkerror(err)
