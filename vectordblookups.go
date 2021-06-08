@@ -76,6 +76,7 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 	}
 
 	wordlist = append(wordlist, uppers...)
+	// note that we are hereby going to feed some of the workers huge lists of capitalized words that will return few hits
 
 	totalwork := len(wordlist)
 	chunksize := totalwork / workercount
@@ -169,8 +170,8 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, tri
 	// some sort of race inside the dbpool...?
 	// increasing MaxConns and/or MinConns is not the solution...
 	if e != nil {
-		// almost never see trial #2 & never saw #3
 		trialnumber += 1
+		// almost never see trial #2 & never saw #3
 		// logiflogging(fmt.Sprintf("%s failed to create a temptable [trial #%d]", rndid, trialnumber), 0, 0)
 		if trialnumber > maxtrials {
 			logiflogging(fmt.Sprintf("arraytmorphologyworker worker#%d exhausted its tries to create a temptable [trial #%d]", workerid, trialnumber), 0, 0)
@@ -291,7 +292,7 @@ func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool)
 	}
 
 	arr := strings.Join(hw, "', '")
-	arr = "'" + arr + "'"
+	arr = fmt.Sprintf("'%s'", arr)
 
 	tt = fmt.Sprintf(tt, rndid, arr)
 	_, err := dbpool.Exec(context.Background(), tt)

@@ -36,7 +36,7 @@ import (
 
 //HipparchiaBagger: Take a key; grab lines; bag them; store them
 func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, thedb string, thestart int, theend int,
-	loglevel int, r RedisLogin, p PostgresLogin) string {
+	loglevel int, hwd string, infl string, r RedisLogin, p PostgresLogin) string {
 
 	logiflogging(fmt.Sprintf("Bagger Module Launched"), loglevel, 1)
 	start := time.Now()
@@ -140,6 +140,9 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	strip := []string{`&nbsp;`, `- `, `<.*?>`}
 	txt = stripper(txt, strip)
 
+	// this would be a good place to deabbreviate, etc...
+	txt = makesubstitutions(txt)
+
 	logiflogging(fmt.Sprintf("preliminary cleanups complete [C: %fs])", time.Now().Sub(start).Seconds()), loglevel, 3)
 
 	// [d] break the text into sentences and assemble []SentenceWithLocus
@@ -175,7 +178,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 
 	// unlemmatized bags of words customers have in fact reached their target as of now
 	if baggingmethod == "unlemmatized" {
-		sentences = dropstopwords(skipinflected, sentences)
+		sentences = dropstopwords(infl, sentences)
 		kk := strings.Split(searchkey, "_")
 		resultkey := kk[0] + "_vectorresults"
 		loadthebags(resultkey, goroutines, sentences, redisclient)
@@ -281,13 +284,17 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	logiflogging(fmt.Sprintf("Finished bagging %d bags [H: %fs]", len(sentences), time.Now().Sub(start).Seconds()), loglevel, 3)
 
 	// [i] purge stopwords
-	sentences = dropstopwords(skipheadwords, sentences)
-	sentences = dropstopwords(skipinflected, sentences)
+	sentences = dropstopwords(hwd, sentences)
+	sentences = dropstopwords(infl, sentences)
 	logiflogging(fmt.Sprintf("Cleared stopwords [I: %fs]", time.Now().Sub(start).Seconds()), loglevel, 3)
 
 	// [j] store...
 	kk := strings.Split(searchkey, "_")
 	resultkey := kk[0] + "_vectorresults"
+
+	for i := 0; i < 5; i++ {
+		logiflogging(fmt.Sprintf("b #%d: %s", i, sentences[i]), loglevel, 0)
+	}
 
 	loadthebags(resultkey, goroutines, sentences, redisclient)
 
