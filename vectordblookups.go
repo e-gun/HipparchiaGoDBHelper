@@ -65,7 +65,7 @@ func getrequiredmorphobjects(wordlist []string, workers int, dbpool *pgxpool.Poo
 	return mo
 }
 
-func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workers int, dbpool *pgxpool.Pool) map[string]DbMorphology {
+func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercount int, dbpool *pgxpool.Pool) map[string]DbMorphology {
 	// NB: this goroutine version not in fact faster with Cicero than doing it without goroutines as one giant array
 	// but the implementation pattern is likely useful for some place where it will make a difference
 
@@ -78,54 +78,53 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workers i
 	wordlist = append(wordlist, uppers...)
 
 	totalwork := len(wordlist)
-	chunksize := totalwork / workers
-	leftover := totalwork % workers
-	wordmap := make(map[int][]string, workers)
+	chunksize := totalwork / workercount
+	leftover := totalwork % workercount
+	wordmap := make(map[int][]string, workercount)
 
-	if totalwork <= workers {
+	if totalwork <= workercount {
 		wordmap[0] = wordlist
 	} else {
 		thestart := 0
-		for i := 0; i < workers; i++ {
+		for i := 0; i < workercount; i++ {
 			wordmap[i] = wordlist[thestart : thestart+chunksize]
 			thestart = thestart + chunksize
 		}
 
 		// leave no sentence behind!
 		if leftover > 0 {
-			wordmap[workers-1] = append(wordmap[workers-1], wordlist[totalwork-leftover-1:totalwork-1]...)
+			wordmap[workercount-1] = append(wordmap[workercount-1], wordlist[totalwork-leftover-1:totalwork-1]...)
 		}
 	}
-
-	// https://golangbyexample.com/return-value-goroutine-go/
 
 	// https://stackoverflow.com/questions/46010836/using-goroutines-to-process-values-and-gather-results-into-a-slice
 	// see the comments of Paul Hankin
 
 	var wg sync.WaitGroup
 	var collector []map[string]DbMorphology
-	channeling := make(chan map[string]DbMorphology, workers)
+	outputchannels := make(chan map[string]DbMorphology, workercount)
 
-	for i := 0; i < workers; i++ {
+	for i := 0; i < workercount; i++ {
 		wg.Add(1)
 		// i will be captured if sent into the function
 		j := i
 		go func(wordlist []string, uselang string, workerid int, dbpool *pgxpool.Pool) {
 			defer wg.Done()
-			channeling <- arraytmorphologyworker(wordmap[j], uselang, j, dbpool)
+			outputchannels <- arraytmorphologyworker(wordmap[j], uselang, j, 0, dbpool)
 		}(wordmap[i], uselang, i, dbpool)
 	}
 
 	go func() {
 		wg.Wait()
-		close(channeling)
+		close(outputchannels)
 	}()
 
 	// merge the results
-	for c := range channeling {
+	for c := range outputchannels {
 		collector = append(collector, c)
 	}
 
+	// map the results
 	foundmorph := make(map[string]DbMorphology)
 	for _, mmap := range collector {
 		for w := range mmap {
@@ -136,8 +135,7 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workers i
 	return foundmorph
 }
 
-func arraytmorphologyworker(wordlist []string, uselang string, workerid int, dbpool *pgxpool.Pool) map[string]DbMorphology {
-
+func arraytmorphologyworker(wordlist []string, uselang string, workerid int, trialnumber int, dbpool *pgxpool.Pool) map[string]DbMorphology {
 	// logiflogging(fmt.Sprintf("arraytmorphologyworker %d was sent %d words", workerid, len(wordlist)), 0, 0)
 
 	// make sure that "0" comes in last so you can watch the parallelism
@@ -154,7 +152,6 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, dbp
 	qt := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE EXISTS " +
 		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = %s_morphology.observed_form)"
 
-	// note that you can get uuid collisions when the routines go too fast; adding "uselang" and "workerid" will stop that
 	rndid := strings.Replace(uuid.New().String(), "-", "", -1)
 	rndid = fmt.Sprintf("%s_%s_mw_%d", rndid, uselang, workerid)
 	arr := strings.Join(wordlist, "', '")
@@ -165,7 +162,32 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, dbp
 	checkerror(err)
 
 	foundrows, e := dbpool.Query(context.Background(), fmt.Sprintf(qt, uselang, rndid, uselang))
-	checkerror(e)
+	// stderr=b'panic: ERROR: relation "ttw_c27067420c144eb2972034b53e77bb58_greek_mw_2" does not exist (SQLSTATE 42P01)
+	// this only happens fairly deep into a vectorbot run
+	// you never see a single error: always 2-4 dying on top of one another
+	// some sort of race...
+	if e != nil {
+		// almost never see trial #2 & never saw #3
+		trialnumber += 1
+		// logiflogging(fmt.Sprintf("%s failed to create a temptable [trial #%d]", rndid, trialnumber), 0, 0)
+		if trialnumber > 3 {
+			logiflogging(fmt.Sprintf("arraytmorphologyworker worker#%d exhausted its tries to create a temptable [trial #%d]", workerid, trialnumber), 0, 0)
+			logiflogging(fmt.Sprintf("your results will be INVALID: a fraction of your words were just zapped", workerid, trialnumber), 0, 0)
+			return make(map[string]DbMorphology)
+		} else {
+			// the following makes no difference...
+			// https://gowalker.org/github.com/jackc/pgx
+			//tx, err := dbpool.Begin(context.Background())
+			//if err != nil {
+			//	checkerror(err)
+			//}
+			//e = tx.Commit(context.Background())
+			//if e != nil {
+			//	checkerror(e)
+			//}
+			return arraytmorphologyworker(wordlist, uselang, workerid, trialnumber, dbpool)
+		}
+	}
 
 	foundmorph := make(map[string]DbMorphology)
 	defer foundrows.Close()
@@ -188,6 +210,11 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, dbp
 			foundmorph[thehit.Observed] = thehit
 		}
 	}
+
+	tt = "DROP TABLE IF EXISTS ttw_%s"
+	tt = fmt.Sprintf(tt, rndid)
+	_, ee := dbpool.Exec(context.Background(), tt)
+	checkerror(ee)
 
 	// logiflogging(fmt.Sprintf("arraytmorphologyworker %d found %d items", workerid, len(foundmorph)), 0, 0)
 	return foundmorph
@@ -243,6 +270,10 @@ func getpossiblemorph(o string, p string, pf *regexp.Regexp) MorphPossibility {
 }
 
 func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
+	if len(headwordset) == 0 {
+		return make(map[string]int)
+	}
+
 	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[%s]) words"
 	qt := "SELECT entry_name, total_count FROM dictionary_headword_wordcounts WHERE EXISTS " +
 		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = dictionary_headword_wordcounts.entry_name)"
@@ -288,7 +319,14 @@ func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool)
 	return returnmap
 }
 
-func parallelredisloader(resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
+func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
+	// logiflogging(fmt.Sprintf("parallelredisloader %d was sent %d bags", workerid, len(bags)), 0, 0)
+	// make sure that "0" comes in last so you can watch the parallelism
+	//if workerid == 0 {
+	//	time.Sleep(pollinginterval)
+	//	time.Sleep(pollinginterval)
+	//}
+
 	for i := 0; i < len(bags); i++ {
 		jsonhit, err := json.Marshal(bags[i])
 		checkerror(err)
@@ -297,85 +335,4 @@ func parallelredisloader(resultkey string, bags []SentenceWithLocus, redisclient
 	// don't actually need to report the key because we know it...
 	// ch <- resultkey
 	wg.Done()
-}
-
-func loopfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
-	// the slow way: via a loop
-	hw := make([]string, 0, len(headwordset))
-	for h := range headwordset {
-		hw = append(hw, h)
-	}
-
-	qt := "SELECT entry_name, total_count FROM dictionary_headword_wordcounts WHERE entry_name = $1"
-	returnmap := make(map[string]int)
-	for i := 0; i < len(hw); i++ {
-		foundrows, e := dbpool.Query(context.Background(), qt, hw[i])
-		checkerror(e)
-		defer foundrows.Close()
-		for foundrows.Next() {
-			var thehit WeightedHeadword
-			err := foundrows.Scan(&thehit.Word, &thehit.Count)
-			if err != nil {
-				fmt.Println(err)
-			}
-			returnmap[thehit.Word] = thehit.Count
-		}
-	}
-
-	// don't kill off unfound terms
-
-	for i := range hw {
-		if _, t := returnmap[hw[i]]; t {
-			continue
-		} else {
-			// this should be mostly proper names
-			// fmt.Println(fmt.Sprintf("unfound set to 0: %s", hw[i]))
-			returnmap[hw[i]] = 0
-		}
-	}
-
-	return returnmap
-}
-
-func looptogetrequiredmorphobjects(wordlist []string, dbpool *pgxpool.Pool) map[string]DbMorphology {
-	// the slow but sure way...
-
-	latintest := regexp.MustCompile(`[a-z]`)
-	qtemplate := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE observed_form = $1"
-	var q string
-
-	foundmorph := make(map[string]DbMorphology)
-
-	for i := 0; i < len(wordlist); i++ {
-		if latintest.MatchString(wordlist[i]) {
-			q = fmt.Sprintf(qtemplate, "latin")
-		} else {
-			q = fmt.Sprintf(qtemplate, "greek")
-		}
-		foundrows, err := dbpool.Query(context.Background(), q, wordlist[i])
-		checkerror(err)
-		defer foundrows.Close()
-		for foundrows.Next() {
-			var thehit DbMorphology
-			err = foundrows.Scan(&thehit.Observed, &thehit.Xrefs, &thehit.PefixXrefs, &thehit.RawPossib)
-			checkerror(err)
-			thehit.UniqPossib = make(map[string]bool)
-			if _, t := foundmorph[thehit.Observed]; t {
-				// logiflogging(fmt.Sprintf("%s is already present; need to append these possibilites to the other possibilities", thehit.Observed), 0, 0)
-				newpos := updatesetofpossibilities(thehit.RawPossib, thehit.UniqPossib)
-				for p := range newpos {
-					if _, t := foundmorph[thehit.Observed].UniqPossib[p]; !t {
-						// logiflogging(fmt.Sprintf("appending to %s: %s", thehit.Observed, p), 0, 0)
-						foundmorph[thehit.Observed].UniqPossib[p] = true
-					}
-				}
-			} else {
-				thehit.UniqPossib = updatesetofpossibilities(thehit.RawPossib, thehit.UniqPossib)
-				foundmorph[thehit.Observed] = thehit
-			}
-		}
-	}
-	logiflogging(fmt.Sprintf("foundmorph contains %d", len(foundmorph)), 0, 0)
-
-	return foundmorph
 }

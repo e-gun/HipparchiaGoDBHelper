@@ -329,7 +329,7 @@ func loadthebags(resultkey string, goroutines int, sentences []SentenceWithLocus
 	var wg sync.WaitGroup
 	for i := 0; i < goroutines; i++ {
 		wg.Add(1)
-		go parallelredisloader(resultkey, bagsofbags[i], redisclient, &wg)
+		go parallelredisloader(i, resultkey, bagsofbags[i], redisclient, &wg)
 	}
 	wg.Wait()
 }
