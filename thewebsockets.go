@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-//fire up our own websocket server because wscheckpoll() in HipparchiaServer is unavailable to golang module users
+//StartHipparchiaPollWebsocket: fire up our own websocket server because wscheckpoll() in HipparchiaServer is unavailable to golang module users
 func StartHipparchiaPollWebsocket(port int, loglevel int, failthreshold int, saving int, rl RedisLogin) {
 	logiflogging(fmt.Sprintf("WebSocket Module Launched"), loglevel, 1)
 	if loglevel < 2 {

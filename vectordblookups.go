@@ -66,7 +66,7 @@ func getrequiredmorphobjects(wordlist []string, workers int, dbpool *pgxpool.Poo
 }
 
 func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercount int, dbpool *pgxpool.Pool) map[string]DbMorphology {
-	// NB: this goroutine version not in fact faster with Cicero than doing it without goroutines as one giant array
+	// NB: this goroutine version not in fact much faster with Cicero than doing it without goroutines as one giant array
 	// but the implementation pattern is likely useful for some place where it will make a difference
 
 	// look for the upper case matches too: Ϲωκράτηϲ and not just ϲωκρατέω (!)
@@ -107,7 +107,7 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 
 	for i := 0; i < workercount; i++ {
 		wg.Add(1)
-		// i will be captured if sent into the function
+		// "i" will be captured if sent into the function
 		j := i
 		go func(wordlist []string, uselang string, workerid int, dbpool *pgxpool.Pool) {
 			defer wg.Done()
@@ -230,6 +230,7 @@ func updatesetofpossibilities(p string, known map[string]bool) map[string]bool {
 	// a new collection of possibilities has arrived <p1>xxx</p1><p2>yyy</p2>...
 	// parse this string for a list of possibilities; then add its elements to the set of known possibilities
 	// return the updated set
+
 	pf := regexp.MustCompile(`(<possibility_\d{1,2}>.*?</possibility_\d{1,2}>)`)
 	mm := pf.FindAllString(p, -1)
 	for i := 0; i < len(mm); i++ {
@@ -327,6 +328,7 @@ func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool)
 
 func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
 	// logiflogging(fmt.Sprintf("parallelredisloader %d was sent %d bags", workerid, len(bags)), 0, 0)
+
 	// make sure that "0" comes in last so you can watch the parallelism
 	//if workerid == 0 {
 	//	time.Sleep(pollinginterval)
@@ -340,7 +342,9 @@ func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocu
 		checkerror(err)
 		redisclient.SAdd(resultkey, jsonhit)
 	}
-	// don't actually need to report the key because we know it...
+
+	// don't actually need to report the key because we know it
 	// ch <- resultkey
+
 	wg.Done()
 }

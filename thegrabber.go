@@ -50,18 +50,9 @@ func grabber(clientnumber int, hitcap int64, searchkey string, loglevel int, r R
 
 	redisclient := grabredisconnection(r)
 	defer redisclient.Close()
-	logiflogging(fmt.Sprintf("grabber #%d connected to redis", clientnumber), loglevel, 2)
-
-	//url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", p.User, p.Pass, p.Host, p.Port, p.DBName)
-	//dbpool, err := pgxpool.Connect(context.Background(), url)
-	//if err != nil {
-	//	logiflogging(fmt.Sprintf("Could not connect to PostgreSQL via %s", url), loglevel, 0)
-	//	panic(err)
-	//}
 
 	dbpool := grabpgsqlconnection(p, 1, loglevel)
 	defer dbpool.Close()
-	logiflogging(fmt.Sprintf("grabber #%d Connected to %s on PostgreSQL", clientnumber, p.DBName), loglevel, 2)
 
 	resultkey := searchkey + "_results"
 
@@ -72,12 +63,11 @@ func grabber(clientnumber int, hitcap int64, searchkey string, loglevel int, r R
 			break
 		}
 
+		// [b] update the polling data
 		remain, err := redisclient.SCard(searchkey).Result()
 		checkerror(err)
-		logiflogging(fmt.Sprintf("grabber #%d says that %d items remain", clientnumber, remain), loglevel, 3)
-
-		// [b] update the polling data
 		redisclient.Set(searchkey+"_remaining", remain, redisexpiration)
+		logiflogging(fmt.Sprintf("grabber #%d says that %d items remain", clientnumber, remain), loglevel, 3)
 
 		// [c] decode the query
 		var prq PrerolledQuery
@@ -92,7 +82,6 @@ func grabber(clientnumber int, hitcap int64, searchkey string, loglevel int, r R
 
 		// [e] execute the main query
 		var foundrows pgx.Rows
-		logiflogging(fmt.Sprintf("grabber #%d will ask: %s", clientnumber, prq.PsqlQuery), loglevel, 4)
 		if prq.PsqlData != "" {
 			foundrows, err = dbpool.Query(context.Background(), prq.PsqlQuery, prq.PsqlData)
 			checkerror(err)
@@ -115,9 +104,10 @@ func grabber(clientnumber int, hitcap int64, searchkey string, loglevel int, r R
 			// [f2] if you have not hit the cap on finds, store the result in 'querykey_results'
 			// also update the polling hitcount key
 			hitcount, err := redisclient.SCard(resultkey).Result()
-			logiflogging(fmt.Sprintf("grabber #%d reports that the hitcount is %d", clientnumber, hitcount), loglevel, 3)
-			redisclient.Set(searchkey+"_hitcount", hitcount, redisexpiration)
 			checkerror(err)
+			redisclient.Set(searchkey+"_hitcount", hitcount, redisexpiration)
+			logiflogging(fmt.Sprintf("grabber #%d reports that the hitcount is %d", clientnumber, hitcount), loglevel, 3)
+
 			if hitcount >= hitcap {
 				// trigger the break in the outer loop
 				redisclient.Del(searchkey)

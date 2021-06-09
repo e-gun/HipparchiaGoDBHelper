@@ -57,7 +57,7 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.1.1"
+	version         = "1.1.2"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -179,6 +179,7 @@ func main() {
 
 	// DO NOT comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer when GOLANGLOADING = 'cli'
 	// sharedlibraryclisearcher(): "resultrediskey = resultrediskey.split()[-1]"
+
 	if t > -1 {
 		fmt.Printf("%d %s have been stored at %s", t, x, o)
 	} else {
@@ -263,6 +264,7 @@ func grabpgsqlconnection(p PostgresLogin, goroutines int, loglevel int) *pgxpool
 
 	// the boring way if you don't want to go via pgxpool.ParseConfig(url)
 	// dbpool, err := pgxpool.Connect(context.Background(), url)
+
 	dbpool, err := pgxpool.ConnectConfig(context.Background(), config)
 
 	if err != nil {
