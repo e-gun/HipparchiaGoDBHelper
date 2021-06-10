@@ -36,7 +36,7 @@ import (
 
 //HipparchiaBagger: Take a key; grab lines; bag them; store them
 func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, thedb string, thestart int, theend int,
-	loglevel int, headwordstoskip string, inflectedtoskip string, r RedisLogin, p PostgresLogin) string {
+	loglevel int, headwordstoskip string, inflectedtoskip string, rl RedisLogin, pl PostgresLogin) string {
 	// this does not work at the moment if called as a python module
 	// but HipparchiaServer does not know how to call it either...
 
@@ -44,7 +44,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	start := time.Now()
 	logiflogging(fmt.Sprintf("Seeking to build *%s* bags of words", baggingmethod), loglevel, 2)
 
-	redisclient := grabredisconnection(r)
+	redisclient := grabredisconnection(rl)
 	defer redisclient.Close()
 	logiflogging(fmt.Sprintf("Connected to redis"), loglevel, 2)
 
@@ -52,7 +52,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	redisclient.Set(searchkey+"_poolofwork", -1, redisexpiration)
 	redisclient.Set(searchkey+"_hitcount", 0, redisexpiration)
 
-	dbpool := grabpgsqlconnection(p, goroutines, loglevel)
+	dbpool := grabpgsqlconnection(pl, goroutines, loglevel)
 	defer dbpool.Close()
 
 	// [a] grab the db lines
@@ -238,7 +238,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 
 	var mo map[string]DbMorphology
-	mo = getrequiredmorphobjects(keys, goroutines, dbpool)
+	mo = getrequiredmorphobjects(keys, goroutines, pl)
 
 	m = fmt.Sprintf("Got morphology for %d terms", len(mo))
 	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)

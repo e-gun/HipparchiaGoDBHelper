@@ -26,7 +26,8 @@ import (
 func HipparchiaGolangSearcher(searchkey string, hitcap int64, goroutines int, loglevel int, r RedisLogin, p PostgresLogin) string {
 	// this is the code that the python module version is calling instead of main()
 	logiflogging(fmt.Sprintf("Searcher Module Launched"), loglevel, 1)
-	runtime.GOMAXPROCS(goroutines)
+
+	runtime.GOMAXPROCS(goroutines + 1)
 
 	recordinitialsizeofworkpile(searchkey, loglevel, r)
 

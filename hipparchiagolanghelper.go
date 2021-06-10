@@ -241,16 +241,16 @@ func decodepsqllogin(psqllogininfo []byte) PostgresLogin {
 // DBCONNECTIONS
 //
 
-func grabredisconnection(r RedisLogin) *redis.Client {
-	redisclient := redis.NewClient(&redis.Options{Addr: r.Addr, Password: r.Password, DB: r.DB})
+func grabredisconnection(rl RedisLogin) *redis.Client {
+	redisclient := redis.NewClient(&redis.Options{Addr: rl.Addr, Password: rl.Password, DB: rl.DB})
 	_, err := redisclient.Ping().Result()
 	checkerror(err)
 	return redisclient
 }
 
-func grabpgsqlconnection(p PostgresLogin, goroutines int, loglevel int) *pgxpool.Pool {
+func grabpgsqlconnection(pl PostgresLogin, goroutines int, loglevel int) *pgxpool.Pool {
 
-	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", p.User, p.Pass, p.Host, p.Port, p.DBName)
+	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", pl.User, pl.Pass, pl.Host, pl.Port, pl.DBName)
 
 	config, oops := pgxpool.ParseConfig(url)
 	if oops != nil {
@@ -272,7 +272,7 @@ func grabpgsqlconnection(p PostgresLogin, goroutines int, loglevel int) *pgxpool
 		panic(err)
 	}
 
-	logiflogging(fmt.Sprintf("Connected to %s on PostgreSQL", p.DBName), loglevel, 2)
+	logiflogging(fmt.Sprintf("Connected to %s on PostgreSQL", pl.DBName), loglevel, 2)
 
 	return dbpool
 }

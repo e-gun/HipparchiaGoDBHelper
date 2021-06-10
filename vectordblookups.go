@@ -37,7 +37,7 @@ func fetchdblinesdirectly(thedb string, thestart int, theend int, dbpool *pgxpoo
 	return dblines
 }
 
-func getrequiredmorphobjects(wordlist []string, workers int, dbpool *pgxpool.Pool) map[string]DbMorphology {
+func getrequiredmorphobjects(wordlist []string, workers int, pl PostgresLogin) map[string]DbMorphology {
 	// run arraytogetrequiredmorphobjects once for each language
 	latintest := regexp.MustCompile(`[a-z]`)
 	var latinwords []string
@@ -50,8 +50,8 @@ func getrequiredmorphobjects(wordlist []string, workers int, dbpool *pgxpool.Poo
 		}
 	}
 
-	lt := arraytogetrequiredmorphobjects(latinwords, "latin", workers, dbpool)
-	gk := arraytogetrequiredmorphobjects(greekwords, "greek", workers, dbpool)
+	lt := arraytogetrequiredmorphobjects(latinwords, "latin", workers, pl)
+	gk := arraytogetrequiredmorphobjects(greekwords, "greek", workers, pl)
 
 	mo := make(map[string]DbMorphology)
 	for k, v := range gk {
@@ -65,7 +65,7 @@ func getrequiredmorphobjects(wordlist []string, workers int, dbpool *pgxpool.Poo
 	return mo
 }
 
-func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercount int, dbpool *pgxpool.Pool) map[string]DbMorphology {
+func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercount int, pl PostgresLogin) map[string]DbMorphology {
 	// NB: this goroutine version not in fact much faster with Cicero than doing it without goroutines as one giant array
 	// but the implementation pattern is likely useful for some place where it will make a difference
 
@@ -109,10 +109,11 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 		wg.Add(1)
 		// "i" will be captured if sent into the function
 		j := i
-		go func(wordlist []string, uselang string, workerid int, dbpool *pgxpool.Pool) {
+		dbp := grabpgsqlconnection(pl, 1, 0)
+		go func(wordlist []string, uselang string, workerid int, dbp *pgxpool.Pool) {
 			defer wg.Done()
-			outputchannels <- arraytmorphologyworker(wordmap[j], uselang, j, 0, dbpool)
-		}(wordmap[i], uselang, i, dbpool)
+			outputchannels <- arraytmorphologyworker(wordmap[j], uselang, j, 0, dbp)
+		}(wordmap[i], uselang, i, dbp)
 	}
 
 	go func() {
@@ -139,16 +140,6 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 func arraytmorphologyworker(wordlist []string, uselang string, workerid int, trialnumber int, dbpool *pgxpool.Pool) map[string]DbMorphology {
 	// logiflogging(fmt.Sprintf("arraytmorphologyworker %d was sent %d words", workerid, len(wordlist)), 0, 0)
 
-	// make sure that "0" comes in last so you can watch the parallelism
-	//if workerid == 0 {
-	//	time.Sleep(pollinginterval)
-	//	time.Sleep(pollinginterval)
-	//}
-
-	// hipparchiaDB=# CREATE TEMPORARY TABLE ttw AS SELECT words AS w FROM unnest(ARRAY['dolor', 'amor', 'lusus']) words;
-	// hipparchiaDB=# SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM latin_morphology
-	//					WHERE EXISTS (SELECT 1 FROM ttw temptable WHERE temptable.w = latin_morphology.observed_form);
-
 	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[%s]) words"
 	qt := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE EXISTS " +
 		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = %s_morphology.observed_form)"
@@ -165,30 +156,20 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, tri
 	foundrows, e := dbpool.Query(context.Background(), fmt.Sprintf(qt, uselang, rndid, uselang))
 	// stderr=b'panic: ERROR: relation "ttw_c27067420c144eb2972034b53e77bb58_greek_mw_2" does not exist (SQLSTATE 42P01)
 	// this error emerged when we moved over to goroutines
-	// this only happens fairly deep into a vectorbot run
-	// you never see a single error: always 2-4 dying on top of one another
-	// some sort of race inside the dbpool...?
-	// increasing MaxConns and/or MinConns is not the solution...
+	// the fix is to give each worker its own pool rather than to share: see "dbp := grabpgsqlconnection(pl, 1, 0)" above
+	// fortunately building the pools does not cost any real time
 	if e != nil {
+		// this is a workaround for the ERROR noted just above; but that error is allegedly fixed; NTL: the following does not hurt...
 		trialnumber += 1
 		// almost never see trial #2 & never saw #3
 		// logiflogging(fmt.Sprintf("%s failed to create a temptable [trial #%d]", rndid, trialnumber), 0, 0)
 		if trialnumber > maxtrials {
-			logiflogging(fmt.Sprintf("arraytmorphologyworker worker#%d exhausted its tries to create a temptable [trial #%d]", workerid, trialnumber), 0, 0)
-			logiflogging(fmt.Sprintf("your results will be INVALID: a fraction of your words were just zapped", workerid, trialnumber), 0, 0)
+			m := fmt.Sprintf("WARNING: arraytmorphologyworker worker#%d exhausted its tries to create a temptable [trial #%d]", workerid, trialnumber)
+			logiflogging(m, 0, 0)
+			m = "WARNING: your results will be INVALID: a substantial fraction of your words just vanished"
+			logiflogging(m, 0, 0)
 			return make(map[string]DbMorphology)
 		} else {
-			// the following makes no difference: but it maybe shows how a Begin that gave a "tx" could be used above...
-			// https://gowalker.org/github.com/jackc/pgx
-			//tx, err := dbpool.Begin(context.Background())
-			//if err != nil {
-			//	checkerror(err)
-			//}
-			//e = tx.Commit(context.Background())
-			//if e != nil {
-			//	checkerror(e)
-			//}
-			// logiflogging(fmt.Sprintf("TotalConns of MaxConns: %d / %d", dbpool.Stat().TotalConns(), dbpool.Stat().MaxConns()), 0, 0)
 			return arraytmorphologyworker(wordlist, uselang, workerid, trialnumber, dbpool)
 		}
 	}
