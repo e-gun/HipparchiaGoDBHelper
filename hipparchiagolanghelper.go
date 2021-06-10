@@ -1,5 +1,5 @@
 //    HipparchiaGoDBHelper: search, vector and websocket helper app and functions for HipparchiaServer
-//    Copyright: E Gunderson 2016-21
+//    Copyright: E Gunderson 2021
 //    License: GNU GENERAL PUBLIC LICENSE 3
 //        (see LICENSE in the top level directory of the distribution)
 
