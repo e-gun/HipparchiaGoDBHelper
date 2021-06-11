@@ -32,7 +32,7 @@ import (
 )
 
 //HipparchiaBagger: Take a key; grab lines; bag them; store them
-func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, thedb string, thestart int, theend int,
+func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb string, thestart int, theend int,
 	loglevel int, headwordstoskip string, inflectedtoskip string, rl RedisLogin, pl PostgresLogin) string {
 	// this does not work at the moment if called as a python module
 	// but HipparchiaServer does not know how to call it either...
@@ -41,46 +41,46 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	start := time.Now()
 	logiflogging(fmt.Sprintf("Seeking to build *%s* bags of words", baggingmethod), loglevel, 2)
 
-	redisclient := grabredisconnection(rl)
-	defer redisclient.Close()
+	rc := grabredisconnection(rl)
+	defer rc.Close()
 	logiflogging(fmt.Sprintf("Connected to redis"), loglevel, 2)
 
-	// turn of progress logging
-	redisclient.Set(searchkey+"_poolofwork", -1, redisexpiration)
-	redisclient.Set(searchkey+"_hitcount", 0, redisexpiration)
+	// turn off progress logging
+	rc.Set(key+"_poolofwork", -1, redisexpiration)
+	rc.Set(key+"_hitcount", 0, redisexpiration)
 
 	dbpool := grabpgsqlconnection(pl, goroutines, loglevel)
 	defer dbpool.Close()
 
 	// [a] grab the db lines
 	// we do this by copying the code inside of grabber but just cut out the storage bits: not DRY, but...
-	remain, err := redisclient.SCard(searchkey).Result()
+	remain, err := rc.SCard(key).Result()
 	checkerror(err)
-	redisclient.Set(searchkey+"_poolofwork", remain, redisexpiration)
+	rc.Set(key+"_poolofwork", remain, redisexpiration)
 
 	dblines := make(map[int]DbWorkline)
 
-	if searchkey == "" {
+	if key == "" {
 		logiflogging(fmt.Sprintf("No redis key; gathering lines with a direct CLI PostgreSQL query"), loglevel, 1)
 		dblines = fetchdblinesdirectly(thedb, thestart, theend, dbpool)
 	} else {
 		count := 0
 		for {
-			// [i] get a query or break the loop
-			thequery, err := redisclient.SPop(searchkey).Result()
+			// [i] get a pre-rolled or break the loop
+			thequery, err := rc.SPop(key).Result()
 			if err != nil {
 				break
 			}
 
 			// [ii] - [v] inside findtherows() because its code is common with grabber's needs
-			foundrows := findtherows(thequery, "bagger", searchkey, 0, loglevel, redisclient, dbpool)
+			foundrows := findtherows(thequery, "bagger", key, 0, loglevel, rc, dbpool)
 
 			// [vi] iterate through the finds
 			defer foundrows.Close()
 			for foundrows.Next() {
 				count += 1
 				if count%1000 == 0 {
-					redisclient.Set(searchkey+"_hitcount", count, redisexpiration)
+					rc.Set(key+"_hitcount", count, redisexpiration)
 				}
 				// convert the find to a DbWorkline
 				var thehit DbWorkline
@@ -94,7 +94,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 
 	m := fmt.Sprintf("%d lines acquired", len(dblines))
-	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
+	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [A: %fs])", time.Now().Sub(start).Seconds())
 	logiflogging(fmt.Sprintf(m), loglevel, 3)
 
@@ -115,7 +115,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	sb.Reset()
 
 	m = fmt.Sprintf("Unified text block built")
-	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
+	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [B: %fs])", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 3)
 
@@ -129,7 +129,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	txt = makesubstitutions(txt)
 
 	m = fmt.Sprintf("Preliminary cleanups complete")
-	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
+	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [C: %fs]", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 3)
 
@@ -163,16 +163,16 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 
 	m = fmt.Sprintf("Found %d sentences", len(sentences))
-	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
+	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [D: %fs]", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 3)
 
 	// unlemmatized bags of words customers have in fact reached their target as of now
 	if baggingmethod == "unlemmatized" {
 		sentences = dropstopwords(inflectedtoskip, sentences)
-		kk := strings.Split(searchkey, "_")
+		kk := strings.Split(key, "_")
 		resultkey := kk[0] + "_vectorresults"
-		loadthebags(resultkey, goroutines, sentences, redisclient)
+		loadthebags(resultkey, goroutines, sentences, rc)
 		// DO NO comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer
 		// "resultrediskey = resultrediskey.split()[-1]"
 		fmt.Println(fmt.Sprintf("%d %s bags of words stored at %s", len(sentences), baggingmethod, resultkey))
@@ -195,7 +195,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 
 	m = fmt.Sprintf("Found %d distinct words", len(allwords))
-	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
+	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [E: %fs]", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 3)
 
@@ -215,7 +215,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	mo = getrequiredmorphobjects(keys, goroutines, pl)
 
 	m = fmt.Sprintf("Got morphology for %d terms", len(mo))
-	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
+	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [F: %fs]", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 3)
 
@@ -265,7 +265,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 
 	m = fmt.Sprintf("Built morphmap for %d terms", len(flatdict))
-	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
+	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [G: %fs]", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 3)
 
@@ -284,7 +284,7 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	}
 
 	m = fmt.Sprintf("Finished bagging %d bags", len(sentences))
-	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
+	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [H: %fs]", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 3)
 
@@ -302,22 +302,22 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	sentences = clearedlist
 
 	m = fmt.Sprintf("Cleared stopwords: %d bags remain", len(sentences))
-	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
+	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [I: %fs]", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 3)
 
 	// [j] store...
-	kk := strings.Split(searchkey, "_")
+	kk := strings.Split(key, "_")
 	resultkey := kk[0] + "_vectorresults"
 
 	//for i := 0; i < 5; i++ {
 	//	logiflogging(fmt.Sprintf("b #%d: %s", i, sentences[i]), loglevel, 5)
 	//}
 
-	loadthebags(resultkey, goroutines, sentences, redisclient)
+	loadthebags(resultkey, goroutines, sentences, rc)
 
 	m = fmt.Sprintf("Finished loading")
-	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
+	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [J: %fs]", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 1)
 

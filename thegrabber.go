@@ -25,49 +25,65 @@ import (
 )
 
 //HipparchiaGolangSearcher: Execute a series of SQL queries stored in redis by dispatching a collection of goroutines
-func HipparchiaGolangSearcher(searchkey string, hitcap int64, goroutines int, loglevel int, r RedisLogin, p PostgresLogin) string {
+func HipparchiaGolangSearcher(thekey string, hitcap int64, workercount int, loglevel int, rl RedisLogin, pl PostgresLogin) string {
 	// this is the code that the python module version is calling instead of main()
 	logiflogging(fmt.Sprintf("Searcher Module Launched"), loglevel, 1)
 
-	runtime.GOMAXPROCS(goroutines + 1)
+	runtime.GOMAXPROCS(workercount + 1)
 
-	recordinitialsizeofworkpile(searchkey, loglevel, r)
+	recordinitialsizeofworkpile(thekey, loglevel, rl)
 
 	var awaiting sync.WaitGroup
 
-	for i := 0; i < goroutines; i++ {
+	// 	for i := 0; i < workercount; i++ {
+	//		wg.Add(1)
+	//		// "i" will be captured if sent into the function
+	//		j := i
+	//		dbp := grabpgsqlconnection(pl, 1, 0)
+	//		go func(wordlist []string, uselang string, workerid int, dbp *pgxpool.Pool) {
+	//			defer wg.Done()
+	//			outputchannels <- arraytmorphologyworker(wordmap[j], uselang, j, 0, dbp)
+	//		}(wordmap[i], uselang, i, dbp)
+	//	}
+	//
+	//	go func() {
+	//		wg.Wait()
+	//		close(outputchannels)
+	//	}()
+
+	for i := 0; i < workercount; i++ {
 		awaiting.Add(1)
-		go grabber(i, hitcap, searchkey, loglevel, r, p, &awaiting)
+		go grabber(i, hitcap, thekey, loglevel, rl, pl, &awaiting)
 	}
 
 	awaiting.Wait()
 
-	resultkey := searchkey + "_results"
+	resultkey := thekey + "_results"
 	return resultkey
 }
 
-func grabber(clientnumber int, hitcap int64, searchkey string, loglevel int, r RedisLogin, p PostgresLogin, awaiting *sync.WaitGroup) {
+func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisLogin, pl PostgresLogin, awaiting *sync.WaitGroup) {
 	// this is where all of the work happens
 	defer awaiting.Done()
-	logiflogging(fmt.Sprintf("Hello from grabber %d", clientnumber), loglevel, 3)
+	logiflogging(fmt.Sprintf("Hello from grabber %d", clientnumber), ll, 3)
 
-	redisclient := grabredisconnection(r)
-	defer redisclient.Close()
+	rc := grabredisconnection(rl)
+	defer rc.Close()
 
-	dbpool := grabpgsqlconnection(p, 1, loglevel)
+	dbpool := grabpgsqlconnection(pl, 1, ll)
 	defer dbpool.Close()
 
 	resultkey := searchkey + "_results"
 
 	for {
-		// [i] get a query or break the loop
-		thequery, err := redisclient.SPop(searchkey).Result()
+		// [i] get a pre-rolled query or break the loop
+		thequery, err := rc.SPop(searchkey).Result()
 		if err != nil {
 			break
 		}
 
 		// [ii] - [v] inside findtherows() because its code is common with HipparchiaBagger's needs
-		foundrows := findtherows(thequery, "grabber", searchkey, clientnumber, loglevel, redisclient, dbpool)
+		foundrows := findtherows(thequery, "grabber", searchkey, clientnumber, ll, rc, dbpool)
 
 		// [vi] iterate through the finds
 		defer foundrows.Close()
@@ -81,35 +97,38 @@ func grabber(clientnumber int, hitcap int64, searchkey string, loglevel int, r R
 
 			// [vi.2] if you have not hit the cap on finds, store the result in 'querykey_results'
 			// also update the polling hitcount key
-			hitcount, err := redisclient.SCard(resultkey).Result()
+			hitcount, err := rc.SCard(resultkey).Result()
 			checkerror(err)
-			redisclient.Set(searchkey+"_hitcount", hitcount, redisexpiration)
-			logiflogging(fmt.Sprintf("grabber #%d reports that the hitcount is %d", clientnumber, hitcount), loglevel, 3)
+			rc.Set(searchkey+"_hitcount", hitcount, redisexpiration)
+			logiflogging(fmt.Sprintf("grabber #%d reports that the hitcount is %d", clientnumber, hitcount), ll, 3)
 
 			if hitcount >= hitcap {
 				// trigger the break in the outer loop
-				redisclient.Del(searchkey)
+				rc.Del(searchkey)
 			} else {
 				jsonhit, err := json.Marshal(thehit)
 				checkerror(err)
-				redisclient.SAdd(resultkey, jsonhit)
-				logiflogging(fmt.Sprintf("grabber #%d added a result to %s: %s.%d", clientnumber, resultkey, thehit.WkUID, thehit.TbIndex), loglevel, 4)
+				rc.SAdd(resultkey, jsonhit)
+				logiflogging(fmt.Sprintf("grabber #%d added a result to %s: %s.%d", clientnumber, resultkey, thehit.WkUID, thehit.TbIndex), ll, 4)
 			}
 		}
 	}
 }
 
-func findtherows(thequery string, theclient string, searchkey string, clientnumber int, loglevel int, redisclient *redis.Client, dbpool *pgxpool.Pool) pgx.Rows {
+func findtherows(thequery string, thecaller string, searchkey string, clientnumber int, ll int, rc *redis.Client, dbpool *pgxpool.Pool) pgx.Rows {
 	// called by both grabber() and HipparchiaBagger()
+
 	// [ii] update the polling data
-	remain, err := redisclient.SCard(searchkey).Result()
-	checkerror(err)
-	redisclient.Set(searchkey+"_remaining", remain, redisexpiration)
-	logiflogging(fmt.Sprintf("%s #%d says that %d items remain", theclient, clientnumber, remain), loglevel, 3)
+	if thecaller != "bagger" {
+		remain, err := rc.SCard(searchkey).Result()
+		checkerror(err)
+		rc.Set(searchkey+"_remaining", remain, redisexpiration)
+		logiflogging(fmt.Sprintf("%s #%d says that %d items remain", thecaller, clientnumber, remain), ll, 3)
+	}
 
 	// [iii] decode the query
 	var prq PrerolledQuery
-	err = json.Unmarshal([]byte(thequery), &prq)
+	err := json.Unmarshal([]byte(thequery), &prq)
 	checkerror(err)
 
 	// [iv] build a temp table if needed
@@ -131,18 +150,18 @@ func findtherows(thequery string, theclient string, searchkey string, clientnumb
 }
 
 func recordinitialsizeofworkpile(k string, loglevel int, rl RedisLogin) {
-	redisclient := grabredisconnection(rl)
-	defer redisclient.Close()
-	remain, err := redisclient.SCard(k).Result()
+	rc := grabredisconnection(rl)
+	defer rc.Close()
+	remain, err := rc.SCard(k).Result()
 	checkerror(err)
-	redisclient.Set(k+"_poolofwork", remain, redisexpiration)
+	rc.Set(k+"_poolofwork", remain, redisexpiration)
 	logiflogging(fmt.Sprintf("recordinitialsizeofworkpile(): initial size of workpile for '%s' is %d", k+"_poolofwork", remain), loglevel, 2)
 }
 
 func fetchfinalnumberofresults(k string, rl RedisLogin) int64 {
-	redisclient := grabredisconnection(rl)
-	defer redisclient.Close()
-	hits, err := redisclient.SCard(k + "_results").Result()
+	rc := grabredisconnection(rl)
+	defer rc.Close()
+	hits, err := rc.SCard(k + "_results").Result()
 	checkerror(err)
 	return hits
 }
