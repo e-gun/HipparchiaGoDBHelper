@@ -111,7 +111,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 		sb.WriteString(newtxt)
 	}
 
-	txt := sb.String()
+	thetext := sb.String()
 	sb.Reset()
 
 	m = fmt.Sprintf("Unified text block built")
@@ -123,10 +123,10 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	// parsevectorsentences()
 
 	strip := []string{`&nbsp;`, `- `, `<.*?>`}
-	txt = stripper(txt, strip)
+	thetext = stripper(thetext, strip)
 
 	// this would be a good place to deabbreviate, etc...
-	txt = makesubstitutions(txt)
+	thetext = makesubstitutions(thetext)
 
 	m = fmt.Sprintf("Preliminary cleanups complete")
 	rc.Set(key+"_statusmessage", m, redisexpiration)
@@ -135,8 +135,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	// [d] break the text into sentences and assemble []SentenceWithLocus
 
-	terminations := []string{".", "?", "!", "·", ";"}
-	s := recursivesplitter([]string{txt}, terminations, 0, len(terminations))
+	ss := splitonpunctuaton(thetext)
 
 	var sentences []SentenceWithLocus
 	var first string
@@ -146,8 +145,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	const notachar = `[^\sa-zα-ωϲϹἀἁἂἃἄἅἆἇᾀᾁᾂᾃᾄᾅᾆᾇᾲᾳᾴᾶᾷᾰᾱὰάἐἑἒἓἔἕὲέἰἱἲἳἴἵἶἷὶίῐῑῒΐῖῗὀὁὂὃὄὅόὸὐὑὒὓὔὕὖὗϋῠῡῢΰῦῧύὺᾐᾑᾒᾓᾔᾕᾖᾗῂῃῄῆῇἤἢἥἣὴήἠἡἦἧὠὡὢὣὤὥὦὧᾠᾡᾢᾣᾤᾥᾦᾧῲῳῴῶῷώὼ]`
 	re := regexp.MustCompile(tagger)
 
-	for i := 0; i < len(s); i++ {
-		tags := re.FindAllStringSubmatch(s[i], -1)
+	for i := 0; i < len(ss); i++ {
+		tags := re.FindAllStringSubmatch(ss[i], -1)
 		if len(tags) > 0 {
 			first = tags[0][1]
 			last = tags[len(tags)-1][1]
@@ -156,7 +155,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 		}
 		var sl SentenceWithLocus
 		sl.Loc = first
-		sl.Sent = strings.ToLower(s[i])
+		sl.Sent = strings.ToLower(ss[i])
 		sl.Sent = stripper(sl.Sent, []string{tagger, notachar})
 		sentences = append(sentences, sl)
 		// fmt.Println(fmt.Sprintf("[%d] %s", i, s[i]))
@@ -183,8 +182,6 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	// [e] figure out all of the words used in the passage
 
-	// buildnnvectorspace()
-
 	// generate a "set" via make(map[string]bool)
 	allwords := make(map[string]bool, len(sentences))
 	for i := 0; i < len(sentences); i++ {
@@ -201,11 +198,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	// [f] find all of the parsing info relative to these words
 
-	// getrequiredmorphobjects(): a candidate for goroutines
-	// lookformorphologymatches()
-
 	// can only send the keys to getrequiredmorphobjects(); so we need to demap things
-
 	keys := make([]string, 0, len(allwords))
 	for k := range allwords {
 		keys = append(keys, k)

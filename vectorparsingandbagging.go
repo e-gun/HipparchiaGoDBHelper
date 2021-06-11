@@ -12,6 +12,10 @@ import (
 	"strings"
 )
 
+//
+// CLEANING
+//
+
 func stripper(item string, purge []string) string {
 	// delete each in a list of items from a string
 	for i := 0; i < len(purge); i++ {
@@ -21,34 +25,62 @@ func stripper(item string, purge []string) string {
 	return item
 }
 
-func recursivesplitter(ss []string, tt []string, c int, e int) []string {
-	for {
-		c += 1
-		var rr []string
-		var t string
+func makesubstitutions(text string) string {
+	// https://golang.org/pkg/strings/#NewReplacer
+	swap := strings.NewReplacer("v", "u", "j", "i", "σ", "ϲ", "ς", "ϲ", "A.", "Aulus", "App.", "Appius",
+		"C.", "Caius", "G.", "Gaius", "Cn.", "Cnaius", "Gn.", "Gnaius", "D.", "Decimus", "L.", "Lucius", "M.", "Marcus",
+		"M.’", "Manius", "N.", "Numerius", "P.", "Publius", "Q.", "Quintus", "S.", "Spurius", "Sp.", "Spurius",
+		"Ser.", "Servius", "Sex.", "Sextus", "T.", "Titus", "Ti", "Tiberius", "V.", "Vibius", "a.", "ante",
+		"d.", "dies", "Id.", "Idibus", "Kal.", "Kalendas", "Non.", "Nonas", "prid.", "pridie", "Ian.", "Ianuarias",
+		"Feb.", "Februarias", "Mart.", "Martias", "Apr.", "Aprilis", "Mai.", "Maias", "Iun.", "Iunias",
+		"Quint.", "Quintilis", "Sext.", "Sextilis", "Sept.", "Septembris", "Oct.", "Octobris", "Nov.", "Novembris",
+		"Dec.", "Decembris")
 
-		if len(tt) > 1 {
-			t = tt[0]
-			tt = tt[1:]
+	return swap.Replace(text)
+}
+
+func splitonpunctuaton(text string) []string {
+	// replacement for recursivesplitter(): perhaps very slightly faster, but definitely much more direct and legible
+	// swap all punctuation for one item; then split on it...
+	swap := strings.NewReplacer("?", ".", "!", ".", "·", ".", ";", ".")
+	text = swap.Replace(text)
+	split := strings.Split(text, ".")
+	return split
+}
+
+func dropstopwords(skipper string, bagsofwords []SentenceWithLocus) []SentenceWithLocus {
+	// set up the skiplist; then iterate through the bags returning new, clean bags
+	s := strings.Split(skipper, " ")
+	sm := make(map[string]bool)
+	for i := 0; i < len(s); i++ {
+		sm[s[i]] = true
+	}
+
+	for i := 0; i < len(bagsofwords); i++ {
+		wl := strings.Split(bagsofwords[i].Sent, " ")
+		wl = stopworddropper(sm, wl)
+		bagsofwords[i].Sent = strings.Join(wl, " ")
+	}
+
+	return bagsofwords
+}
+
+func stopworddropper(stops map[string]bool, wordlist []string) []string {
+	// if word is in stops, drop the word
+	var returnlist []string
+	for i := 0; i < len(wordlist); i++ {
+		if _, t := stops[wordlist[i]]; t {
+			continue
 		} else {
-			t = tt[0]
-		}
-
-		for i := 0; i < len(ss); i++ {
-			rr = append(rr, strings.Split(ss[i], t)...)
-		}
-
-		//for i := 0; i < len(rr); i++ {
-		//	fmt.Printf(fmt.Sprintf("%d.%d: %s\n", c, i, rr[i]))
-		//}
-
-		if c < e {
-			return recursivesplitter(rr, tt, c, e)
-		} else {
-			return rr
+			returnlist = append(returnlist, wordlist[i])
 		}
 	}
+	return returnlist
 }
+
+//
+// BAGGING
+//
 
 func buildflatbagsofwords(bags []SentenceWithLocus, parsemap map[string][]string) []SentenceWithLocus {
 	// turn a list of sentences into a list of list of headwords; here we put alternate possibilities next to one another:
@@ -152,48 +184,4 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 	bags = buildflatbagsofwords(bags, newparsemap)
 
 	return bags
-}
-
-func dropstopwords(skipper string, bagsofwords []SentenceWithLocus) []SentenceWithLocus {
-	// set up the skiplist; then iterate through the bags returning new, clean bags
-	s := strings.Split(skipper, " ")
-	sm := make(map[string]bool)
-	for i := 0; i < len(s); i++ {
-		sm[s[i]] = true
-	}
-
-	for i := 0; i < len(bagsofwords); i++ {
-		wl := strings.Split(bagsofwords[i].Sent, " ")
-		wl = stopworddropper(sm, wl)
-		bagsofwords[i].Sent = strings.Join(wl, " ")
-	}
-
-	return bagsofwords
-}
-
-func stopworddropper(stops map[string]bool, wordlist []string) []string {
-	// if word is in stops, drop the word
-	var returnlist []string
-	for i := 0; i < len(wordlist); i++ {
-		if _, t := stops[wordlist[i]]; t {
-			continue
-		} else {
-			returnlist = append(returnlist, wordlist[i])
-		}
-	}
-	return returnlist
-}
-
-func makesubstitutions(text string) string {
-	// https://golang.org/pkg/strings/#NewReplacer
-	swap := strings.NewReplacer("v", "u", "j", "i", "σ", "ϲ", "ς", "ϲ", "A.", "Aulus", "App.", "Appius",
-		"C.", "Caius", "G.", "Gaius", "Cn.", "Cnaius", "Gn.", "Gnaius", "D.", "Decimus", "L.", "Lucius", "M.", "Marcus",
-		"M.’", "Manius", "N.", "Numerius", "P.", "Publius", "Q.", "Quintus", "S.", "Spurius", "Sp.", "Spurius",
-		"Ser.", "Servius", "Sex.", "Sextus", "T.", "Titus", "Ti", "Tiberius", "V.", "Vibius", "a.", "ante",
-		"d.", "dies", "Id.", "Idibus", "Kal.", "Kalendas", "Non.", "Nonas", "prid.", "pridie", "Ian.", "Ianuarias",
-		"Feb.", "Februarias", "Mart.", "Martias", "Apr.", "Aprilis", "Mai.", "Maias", "Iun.", "Iunias",
-		"Quint.", "Quintilis", "Sext.", "Sextilis", "Sept.", "Septembris", "Oct.", "Octobris", "Nov.", "Novembris",
-		"Dec.", "Decembris")
-
-	return swap.Replace(text)
 }
