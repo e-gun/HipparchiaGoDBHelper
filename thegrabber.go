@@ -35,22 +35,6 @@ func HipparchiaGolangSearcher(thekey string, hitcap int64, workercount int, logl
 
 	var awaiting sync.WaitGroup
 
-	// 	for i := 0; i < workercount; i++ {
-	//		wg.Add(1)
-	//		// "i" will be captured if sent into the function
-	//		j := i
-	//		dbp := grabpgsqlconnection(pl, 1, 0)
-	//		go func(wordlist []string, uselang string, workerid int, dbp *pgxpool.Pool) {
-	//			defer wg.Done()
-	//			outputchannels <- arraytmorphologyworker(wordmap[j], uselang, j, 0, dbp)
-	//		}(wordmap[i], uselang, i, dbp)
-	//	}
-	//
-	//	go func() {
-	//		wg.Wait()
-	//		close(outputchannels)
-	//	}()
-
 	for i := 0; i < workercount; i++ {
 		awaiting.Add(1)
 		go grabber(i, hitcap, thekey, loglevel, rl, pl, &awaiting)
@@ -105,6 +89,7 @@ func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisL
 			if hitcount >= hitcap {
 				// trigger the break in the outer loop
 				rc.Del(searchkey)
+				foundrows.Close()
 			} else {
 				jsonhit, err := json.Marshal(thehit)
 				checkerror(err)
