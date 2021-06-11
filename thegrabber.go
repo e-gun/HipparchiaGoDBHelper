@@ -17,7 +17,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-redis/redis"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"runtime"
 	"sync"
 )
@@ -58,51 +60,26 @@ func grabber(clientnumber int, hitcap int64, searchkey string, loglevel int, r R
 	resultkey := searchkey + "_results"
 
 	for {
-		// [a] get a query
-		byteArray, err := redisclient.SPop(searchkey).Result()
+		// [i] get a query or break the loop
+		thequery, err := redisclient.SPop(searchkey).Result()
 		if err != nil {
 			break
 		}
 
-		// [b] update the polling data
-		remain, err := redisclient.SCard(searchkey).Result()
-		checkerror(err)
-		redisclient.Set(searchkey+"_remaining", remain, redisexpiration)
-		logiflogging(fmt.Sprintf("grabber #%d says that %d items remain", clientnumber, remain), loglevel, 3)
+		// [ii] - [v] inside findtherows() because its code is common with HipparchiaBagger's needs
+		foundrows := findtherows(thequery, "grabber", searchkey, clientnumber, loglevel, redisclient, dbpool)
 
-		// [c] decode the query
-		var prq PrerolledQuery
-		err = json.Unmarshal([]byte(byteArray), &prq)
-		checkerror(err)
-
-		// [d] build a temp table if needed
-		if prq.TempTable != "" {
-			_, err := dbpool.Exec(context.Background(), prq.TempTable)
-			checkerror(err)
-		}
-
-		// [e] execute the main query
-		var foundrows pgx.Rows
-		if prq.PsqlData != "" {
-			foundrows, err = dbpool.Query(context.Background(), prq.PsqlQuery, prq.PsqlData)
-			checkerror(err)
-		} else {
-			foundrows, err = dbpool.Query(context.Background(), prq.PsqlQuery)
-			checkerror(err)
-		}
-
-		// [f] iterate through the finds
+		// [vi] iterate through the finds
 		defer foundrows.Close()
 		for foundrows.Next() {
-			// [f1] convert the find to a DbWorkline
+			// [vi.1] convert the find to a DbWorkline
 			var thehit DbWorkline
 			err = foundrows.Scan(&thehit.WkUID, &thehit.TbIndex, &thehit.Lvl5Value, &thehit.Lvl4Value, &thehit.Lvl3Value,
 				&thehit.Lvl2Value, &thehit.Lvl1Value, &thehit.Lvl0Value, &thehit.MarkedUp, &thehit.Accented,
 				&thehit.Stripped, &thehit.Hypenated, &thehit.Annotations)
 			checkerror(err)
-			// fmt.Println(thehit)
 
-			// [f2] if you have not hit the cap on finds, store the result in 'querykey_results'
+			// [vi.2] if you have not hit the cap on finds, store the result in 'querykey_results'
 			// also update the polling hitcount key
 			hitcount, err := redisclient.SCard(resultkey).Result()
 			checkerror(err)
@@ -120,6 +97,37 @@ func grabber(clientnumber int, hitcap int64, searchkey string, loglevel int, r R
 			}
 		}
 	}
+}
+
+func findtherows(thequery string, theclient string, searchkey string, clientnumber int, loglevel int, redisclient *redis.Client, dbpool *pgxpool.Pool) pgx.Rows {
+	// called by both grabber() and HipparchiaBagger()
+	// [ii] update the polling data
+	remain, err := redisclient.SCard(searchkey).Result()
+	checkerror(err)
+	redisclient.Set(searchkey+"_remaining", remain, redisexpiration)
+	logiflogging(fmt.Sprintf("%s #%d says that %d items remain", theclient, clientnumber, remain), loglevel, 3)
+
+	// [iii] decode the query
+	var prq PrerolledQuery
+	err = json.Unmarshal([]byte(thequery), &prq)
+	checkerror(err)
+
+	// [iv] build a temp table if needed
+	if prq.TempTable != "" {
+		_, err := dbpool.Exec(context.Background(), prq.TempTable)
+		checkerror(err)
+	}
+
+	// [v] execute the main query
+	var foundrows pgx.Rows
+	if prq.PsqlData != "" {
+		foundrows, err = dbpool.Query(context.Background(), prq.PsqlQuery, prq.PsqlData)
+		checkerror(err)
+	} else {
+		foundrows, err = dbpool.Query(context.Background(), prq.PsqlQuery)
+		checkerror(err)
+	}
+	return foundrows
 }
 
 func recordinitialsizeofworkpile(k string, loglevel int, rl RedisLogin) {

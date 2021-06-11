@@ -57,7 +57,7 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.1.2"
+	version         = "1.1.3"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -70,7 +70,7 @@ const (
 )
 
 //
-// see THEGRABBER.GO and THEVECTORS.GO for the two core functions of HipparchiaGoDBHelper
+// see THEGRABBER.GO, THEVECTORS.GO, and THEWEBSOCKETS.GO for the basic branches of HipparchiaGoDBHelper
 //
 
 func main() {

@@ -22,11 +22,8 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/go-redis/redis"
-	"github.com/jackc/pgx/v4"
 	"os"
 	"regexp"
 	"strings"
@@ -69,39 +66,16 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	} else {
 		count := 0
 		for {
-			// [i] get a query
-			byteArray, err := redisclient.SPop(searchkey).Result()
+			// [i] get a query or break the loop
+			thequery, err := redisclient.SPop(searchkey).Result()
 			if err != nil {
 				break
 			}
 
-			remain, err := redisclient.SCard(searchkey).Result()
-			checkerror(err)
-			logiflogging(fmt.Sprintf("bagger says that %d locations still need grabbing", remain), loglevel, 4)
+			// [ii] - [v] inside findtherows() because its code is common with grabber's needs
+			foundrows := findtherows(thequery, "bagger", searchkey, 0, loglevel, redisclient, dbpool)
 
-			// [ii] decode the query
-			var prq PrerolledQuery
-			err = json.Unmarshal([]byte(byteArray), &prq)
-			checkerror(err)
-
-			// [iii] build a temp table if needed
-			if prq.TempTable != "" {
-				_, err := dbpool.Exec(context.Background(), prq.TempTable)
-				checkerror(err)
-			}
-
-			// [iv] execute the main query
-			var foundrows pgx.Rows
-			logiflogging(fmt.Sprintf("bagger will ask: %s", prq.PsqlQuery), loglevel, 5)
-			if prq.PsqlData != "" {
-				foundrows, err = dbpool.Query(context.Background(), prq.PsqlQuery, prq.PsqlData)
-				checkerror(err)
-			} else {
-				foundrows, err = dbpool.Query(context.Background(), prq.PsqlQuery)
-				checkerror(err)
-			}
-
-			// [v] iterate through the finds
+			// [vi] iterate through the finds
 			defer foundrows.Close()
 			for foundrows.Next() {
 				count += 1
@@ -318,7 +292,16 @@ func HipparchiaBagger(searchkey string, baggingmethod string, goroutines int, th
 	sentences = dropstopwords(headwordstoskip, sentences)
 	sentences = dropstopwords(inflectedtoskip, sentences)
 
-	m = fmt.Sprintf("Cleared stopwords")
+	var clearedlist []SentenceWithLocus
+	for i := 0; i < len(sentences); i++ {
+		if sentences[i].Sent != "" {
+			clearedlist = append(clearedlist, sentences[i])
+		}
+	}
+
+	sentences = clearedlist
+
+	m = fmt.Sprintf("Cleared stopwords: %d bags remain", len(sentences))
 	redisclient.Set(searchkey+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [I: %fs]", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 3)
