@@ -86,7 +86,7 @@ func buildflatbagsofwords(bags []SentenceWithLocus, parsemap map[string][]string
 	// turn a list of sentences into a list of list of headwords; here we put alternate possibilities next to one another:
 	// flatbags: ϲυγγενεύϲ ϲυγγενήϲ
 	// composite: ϲυγγενεύϲ·ϲυγγενήϲ
-	// this is parallizable...
+
 	for i := 0; i < len(bags); i++ {
 		var newwords []string
 		words := strings.Split(bags[i].Sent, " ")
@@ -96,13 +96,6 @@ func buildflatbagsofwords(bags []SentenceWithLocus, parsemap map[string][]string
 		bags[i].Sent = strings.Join(newwords, " ")
 	}
 
-	// peek at a bag...
-	//for i := 0; i < len(bags); i++ {
-	//	if strings.Contains(bags[i].Sent, "ωκρ") {
-	//		fmt.Println(fmt.Sprintf("%s: %s", bags[i].Loc, bags[i].Sent))
-	//	}
-	//}
-
 	return bags
 }
 
@@ -110,7 +103,7 @@ func buildcompositebagsofwords(bags []SentenceWithLocus, parsemap map[string][]s
 	// turn a list of sentences into a list of list of headwords; here we put yoked alternate possibilities next to one another:
 	// flatbags: ϲυγγενεύϲ ϲυγγενήϲ
 	// composite: ϲυγγενεύϲ·ϲυγγενήϲ
-	// this is parallizable...
+
 	for i := 0; i < len(bags); i++ {
 		var newwords []string
 		words := strings.Split(bags[i].Sent, " ")
@@ -138,10 +131,10 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 
 	// [b] assign scores to each of them
 
-	// scoremap := loopfetchheadwordcounts(allheadwords, dbpool)
 	scoremap := arrayfetchheadwordcounts(allheadwords, dbpool)
 
 	// [c] note that there are capital words in here that need lowering
+
 	// [c1] lower the internal values first
 	for i := range parsemap {
 		for j := 0; j < len(parsemap[i]); j++ {
@@ -173,13 +166,6 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 	}
 
 	// [e] now you can just buildflatbagsofwords() with the new pruned parsemap
-
-	// peek at a winner...
-	//for i := range newparsemap {
-	//	if strings.Contains(i, "ωκρ") {
-	//		fmt.Println(fmt.Sprintf("[ZZ] %s %s", i, newparsemap[i]))
-	//	}
-	//}
 
 	bags = buildflatbagsofwords(bags, newparsemap)
 

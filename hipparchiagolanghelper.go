@@ -92,7 +92,7 @@ func main() {
 	var r string
 	var p string
 
-	flag.StringVar(&k, "k", "go", "[searches] redis key to use")
+	flag.StringVar(&k, "k", "", "[searches] redis key to use")
 	flag.Int64Var(&c, "c", 200, "[searches] max hit count")
 	flag.IntVar(&g, "t", 5, "[common] number of goroutines to dispatch")
 	flag.IntVar(&l, "l", 1, "[common] logging level: 0 is silent; 5 is very noisy")

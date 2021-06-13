@@ -22,3 +22,4 @@ bzip2 ${T}/${P}-${U}-${V}
 cp ${T}/${P}-${U}-${V}.bz2 ${T}/${P}-${U}-latest.bz2
 
 echo "Latest ${U} is ${V}" > ${T}/latest_${U}.txt
+md5 ${P} | cut -d" " -f 4 > ${T}/latest_${U}_md5.txt

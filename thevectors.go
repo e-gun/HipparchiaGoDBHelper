@@ -136,7 +136,6 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	// [d] break the text into sentences and assemble []SentenceWithLocus
 
 	ss := splitonpunctuaton(thetext)
-
 	var sentences []SentenceWithLocus
 	var first string
 	var last string
@@ -158,7 +157,6 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 		sl.Sent = strings.ToLower(ss[i])
 		sl.Sent = stripper(sl.Sent, []string{tagger, notachar})
 		sentences = append(sentences, sl)
-		// fmt.Println(fmt.Sprintf("[%d] %s", i, s[i]))
 	}
 
 	m = fmt.Sprintf("Found %d sentences", len(sentences))
@@ -273,7 +271,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	case "winnertakesall":
 		sentences = buildwinnertakesallbagsofwords(sentences, flatdict, dbpool)
 	default:
-		logiflogging(fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", baggingmethod), loglevel, 0)
+		m = fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", baggingmethod)
+		logiflogging(m, loglevel, 0)
 	}
 
 	m = fmt.Sprintf("Finished bagging %d bags", len(sentences))
@@ -313,6 +312,9 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	rc.Set(key+"_statusmessage", m, redisexpiration)
 	m = m + fmt.Sprintf(" [J: %fs]", time.Now().Sub(start).Seconds())
 	logiflogging(m, loglevel, 1)
+
+	rc.Set(key+"_poolofwork", -1, redisexpiration)
+	rc.Set(key+"_hitcount", 0, redisexpiration)
 
 	return resultkey
 }

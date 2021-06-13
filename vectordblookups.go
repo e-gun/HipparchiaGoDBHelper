@@ -66,7 +66,7 @@ func getrequiredmorphobjects(wordlist []string, workers int, pl PostgresLogin) m
 }
 
 func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercount int, pl PostgresLogin) map[string]DbMorphology {
-	// NB: this goroutine version not in fact much faster with Cicero than doing it without goroutines as one giant array
+	// NB: this goroutine version not in fact that much faster with Cicero than doing it without goroutines as one giant array
 	// but the implementation pattern is likely useful for some place where it will make a difference
 
 	// look for the upper case matches too: Ϲωκράτηϲ and not just ϲωκρατέω (!)
@@ -99,7 +99,7 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 	}
 
 	// https://stackoverflow.com/questions/46010836/using-goroutines-to-process-values-and-gather-results-into-a-slice
-	// see the comments of Paul Hankin
+	// see the comments of Paul Hankin re. building an anonymous function
 
 	var wg sync.WaitGroup
 	var collector []map[string]DbMorphology
@@ -138,8 +138,6 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 }
 
 func arraytmorphologyworker(wordlist []string, uselang string, workerid int, trialnumber int, dbpool *pgxpool.Pool) map[string]DbMorphology {
-	// logiflogging(fmt.Sprintf("arraytmorphologyworker %d was sent %d words", workerid, len(wordlist)), 0, 0)
-
 	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[%s]) words"
 	qt := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE EXISTS " +
 		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = %s_morphology.observed_form)"
@@ -147,7 +145,7 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, tri
 	rndid := strings.Replace(uuid.New().String(), "-", "", -1)
 	rndid = fmt.Sprintf("%s_%s_mw_%d", rndid, uselang, workerid)
 	arr := strings.Join(wordlist, "', '")
-	arr = "'" + arr + "'"
+	arr = fmt.Sprintf("'%s'", arr)
 	tt = fmt.Sprintf(tt, rndid, arr)
 
 	_, err := dbpool.Exec(context.Background(), tt)
@@ -196,14 +194,6 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, tri
 		}
 	}
 
-	// the next is not needed and does not fix the error documented above...
-
-	//tt = "DROP TABLE IF EXISTS ttw_%s"
-	//tt = fmt.Sprintf(tt, rndid)
-	//_, ee := dbpool.Exec(context.Background(), tt)
-	//checkerror(ee)
-
-	// logiflogging(fmt.Sprintf("arraytmorphologyworker %d found %d items", workerid, len(foundmorph)), 0, 0)
 	return foundmorph
 }
 
@@ -308,8 +298,6 @@ func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool)
 }
 
 func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
-	// logiflogging(fmt.Sprintf("parallelredisloader %d was sent %d bags", workerid, len(bags)), 0, 0)
-
 	// make sure that "0" comes in last so you can watch the parallelism
 	//if workerid == 0 {
 	//	time.Sleep(pollinginterval)
@@ -323,9 +311,6 @@ func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocu
 		checkerror(err)
 		redisclient.SAdd(resultkey, jsonhit)
 	}
-
-	// don't actually need to report the key because we know it
-	// ch <- resultkey
 
 	wg.Done()
 }
