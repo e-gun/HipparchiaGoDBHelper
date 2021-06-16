@@ -38,6 +38,43 @@
 //	[e] when the poll disappears from redis, the messages stop broadcasting
 //
 
+// Usage of ./HipparchiaGoDBHelper:
+//  -c int
+//        [searches] max hit count (default 200)
+//  -k string
+//        [searches] redis key to use
+//  -l int
+//        [common] logging level: 0 is silent; 5 is very noisy (default 1)
+//  -p string
+//        [common] psql logon information (as a JSON string) (default "{\"Host\": \"localhost\", \"Port\": 5432, \"User\": \"hippa_wr\", \"Pass\": \"\", \"DBName\": \"hipparchiaDB\"}")
+//  -r string
+//        [common] redis logon information (as a JSON string) (default "{\"Addr\": \"localhost:6379\", \"Password\": \"\", \"DB\": 0}")
+//  -sv
+//        [vectors] assert that this is a vectorizing run
+//  -svb string
+//        [vectors] the bagging method: choices are alternates, flat, unlemmatized, winnertakesall (default "winnertakesall")
+//  -svdb string
+//        [vectors][for manual debugging] db to grab from (default "lt0448")
+//  -sve int
+//        [vectors][for manual debugging] last line to grab (default 26)
+//  -svhw string
+//        [vectors] provide a string of headwords to skip 'one two three...' (default "(suppressed owing to length)")
+//  -svin string
+//        [vectors][provide a string of inflected forms to skip 'one two three...' (default "(suppressed owing to length)")
+//  -svs int
+//        [vectors][for manual debugging] first line to grab (default 1)
+//  -t int
+//        [common] number of goroutines to dispatch (default 5)
+//  -v    [common] print version and exit
+//  -ws
+//        [websockets] assert that you are requesting the websocket server
+//  -wsf int
+//        [websockets] fail threshold before messages stop being sent (default 3)
+//  -wsp int
+//        [websockets] port on which to open the websocket server (default 5010)
+//  -wss int
+//        [websockets] save the polls instead of deleting them: 0 is no; 1 is yes
+
 // toggle the package name to shift between cli and module builds: main or hipparchiagolangsearching
 package main
 
@@ -57,7 +94,7 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.1.4"
+	version         = "1.1.5"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -177,7 +214,7 @@ func main() {
 		x = "hits"
 	}
 
-	// DO NOT comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer when GOLANGLOADING = 'cli'
+	// DO NOT comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer when EXTERNALLOADING = 'cli'
 	// sharedlibraryclisearcher(): "resultrediskey = resultrediskey.split()[-1]"
 
 	if t > -1 {
@@ -248,7 +285,7 @@ func grabredisconnection(rl RedisLogin) *redis.Client {
 	return redisclient
 }
 
-func grabpgsqlconnection(pl PostgresLogin, goroutines int, loglevel int) *pgxpool.Pool {
+func grabpgsqlconnection(pl PostgresLogin, workers int, loglevel int) *pgxpool.Pool {
 
 	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", pl.User, pl.Pass, pl.Host, pl.Port, pl.DBName)
 
@@ -259,8 +296,8 @@ func grabpgsqlconnection(pl PostgresLogin, goroutines int, loglevel int) *pgxpoo
 	}
 
 	config.ConnConfig.PreferSimpleProtocol = true
-	config.MaxConns = int32((goroutines + 2) * 2)
-	config.MinConns = int32(goroutines + 2)
+	config.MaxConns = int32((workers + 2) * 2)
+	config.MinConns = int32(workers + 2)
 
 	// the boring way if you don't want to go via pgxpool.ParseConfig(url)
 	// dbpool, err := pgxpool.Connect(context.Background(), url)

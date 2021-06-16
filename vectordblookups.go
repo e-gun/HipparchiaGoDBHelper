@@ -112,7 +112,7 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 		dbp := grabpgsqlconnection(pl, 1, 0)
 		go func(wordlist []string, uselang string, workerid int, dbp *pgxpool.Pool) {
 			defer wg.Done()
-			outputchannels <- arraytmorphologyworker(wordmap[j], uselang, j, 0, dbp)
+			outputchannels <- morphologyworker(wordmap[j], uselang, j, 0, dbp)
 		}(wordmap[i], uselang, i, dbp)
 	}
 
@@ -137,7 +137,7 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 	return foundmorph
 }
 
-func arraytmorphologyworker(wordlist []string, uselang string, workerid int, trialnumber int, dbpool *pgxpool.Pool) map[string]DbMorphology {
+func morphologyworker(wordlist []string, uselang string, workerid int, trialnumber int, dbpool *pgxpool.Pool) map[string]DbMorphology {
 	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[%s]) words"
 	qt := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE EXISTS " +
 		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = %s_morphology.observed_form)"
@@ -162,13 +162,13 @@ func arraytmorphologyworker(wordlist []string, uselang string, workerid int, tri
 		// almost never see trial #2 & never saw #3
 		// logiflogging(fmt.Sprintf("%s failed to create a temptable [trial #%d]", rndid, trialnumber), 0, 0)
 		if trialnumber > maxtrials {
-			m := fmt.Sprintf("WARNING: arraytmorphologyworker worker#%d exhausted its tries to create a temptable [trial #%d]", workerid, trialnumber)
+			m := fmt.Sprintf("WARNING: morphologyworker worker#%d exhausted its tries to create a temptable [trial #%d]", workerid, trialnumber)
 			logiflogging(m, 0, 0)
 			m = "WARNING: your results will be INVALID: a substantial fraction of your words just vanished"
 			logiflogging(m, 0, 0)
 			return make(map[string]DbMorphology)
 		} else {
-			return arraytmorphologyworker(wordlist, uselang, workerid, trialnumber, dbpool)
+			return morphologyworker(wordlist, uselang, workerid, trialnumber, dbpool)
 		}
 	}
 
@@ -210,7 +210,7 @@ func updatesetofpossibilities(p string, known map[string]bool) map[string]bool {
 	return known
 }
 
-func getpossiblemorph(o string, p string, pf *regexp.Regexp) MorphPossibility {
+func parsepossiblemorph(o string, p string, pf *regexp.Regexp) MorphPossibility {
 	// pf := regexp.MustCompile(`(<possibility_(\d{1,2})>)(.*?)<xref_value>(.*?)</xref_value><xref_kind>(.*?)</xref_kind>(.*?)</possibility_\d{1,2}>`)
 
 	m := pf.FindStringSubmatchIndex(p)
@@ -247,7 +247,7 @@ func getpossiblemorph(o string, p string, pf *regexp.Regexp) MorphPossibility {
 	return mp
 }
 
-func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
+func fetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {
 	if len(headwordset) == 0 {
 		return make(map[string]int)
 	}
@@ -279,9 +279,7 @@ func arrayfetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool)
 	for foundrows.Next() {
 		var thehit WeightedHeadword
 		err = foundrows.Scan(&thehit.Word, &thehit.Count)
-		if err != nil {
-			fmt.Println(err)
-		}
+		checkerror(err)
 		returnmap[thehit.Word] = thehit.Count
 	}
 

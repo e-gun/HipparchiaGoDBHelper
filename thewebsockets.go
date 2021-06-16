@@ -33,34 +33,34 @@ func StartHipparchiaPollWebsocket(port int, loglevel int, failthreshold int, sav
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := gin.New()
-	m := melody.New()
+	ws := gin.New()
+	msg := melody.New()
 
-	r.GET("/", func(c *gin.Context) {
-		e := m.HandleRequest(c.Writer, c.Request)
+	ws.GET("/", func(c *gin.Context) {
+		e := msg.HandleRequest(c.Writer, c.Request)
 		if e != nil {
 			fmt.Println("melody choked when it tried to 'HandleRequest'")
 		}
 	})
 
-	m.HandleMessage(func(s *melody.Session, searchid []byte) {
+	msg.HandleMessage(func(s *melody.Session, searchid []byte) {
 		if len(searchid) < 16 {
 			// at this point you have "ebf24e19" and NOT ebf24e19; fix that
 			// id := string(searchid[1 : len(searchid)-1])
 			keycleaner := regexp.MustCompile(`[^a-f0-9]`)
 			id := keycleaner.ReplaceAllString(string(searchid), "")
 			logiflogging(fmt.Sprintf("id is %s", id), loglevel, 1)
-			runpollmessageloop(id, loglevel, failthreshold, saving, rl, m)
+			runpollmessageloop(id, loglevel, failthreshold, saving, rl, msg)
 		}
 	})
 
-	err := r.Run(fmt.Sprintf(":%d", port))
+	err := ws.Run(fmt.Sprintf(":%d", port))
 	checkerror(err)
 }
 
-func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving int, rl RedisLogin, m *melody.Melody) {
-	redisclient := grabredisconnection(rl)
-	defer redisclient.Close()
+func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving int, rl RedisLogin, msg *melody.Melody) {
+	rc := grabredisconnection(rl)
+	defer rc.Close()
 
 	// note that these are lower case inside of redis, but they get reported as upper-case
 	// this all comes back to problems exporting fields of structs and our use of reflect
@@ -82,11 +82,11 @@ func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving
 		time.Sleep(pollinginterval)
 		// the flow is a bit fussy, but separation should allow for easier maintenance if/when things
 		// change on HipparchiaServer's end
-		redisvals := retrievepollingdata(searchid, rediskeys, loglevel, redisclient)
+		redisvals := retrievepollingdata(searchid, rediskeys, loglevel, rc)
 		cpd := typeconvertpollingdata(searchid, rediskeys, redisvals)
 		jsonreply, err := json.Marshal(cpd)
 		checkerror(err)
-		e := m.Broadcast(jsonreply)
+		e := msg.Broadcast(jsonreply)
 		checkerror(e)
 
 		// rediskeys[1] = "active"
@@ -108,7 +108,7 @@ func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving
 		}
 	}
 	if saving < 1 {
-		deletewhendone(searchid, rediskeys, loglevel, redisclient)
+		deletewhendone(searchid, rediskeys, loglevel, rc)
 	} else {
 		logiflogging(fmt.Sprintf("retained redis keys for %s", searchid), loglevel, 1)
 	}
@@ -134,7 +134,7 @@ func typeconvertpollingdata(searchid string, rediskeys [8]string, redisvals [8]s
 	// *but* since you are going back to JSON, you can in practice skip getting the types right inside of golang
 	// the rust version just grabs the data; hashmaps it with the right keys; then jsonifies it
 	// the equivalent here would be to just let CompositePollingData have String as its type in every field, i.e.,
-	// all of the reflect tests could be skipped
+	// all of the reflect tests could be skipped; nevertheless it is useful to have a sample of how to implement reflect...
 
 	// https://stackoverflow.com/questions/6395076/using-reflect-how-do-you-set-the-value-of-a-struct-field/6396678#6396678
 	// https://samwize.com/2015/03/20/how-to-use-reflect-to-set-a-struct-field/
@@ -146,6 +146,7 @@ func typeconvertpollingdata(searchid string, rediskeys [8]string, redisvals [8]s
 	//	[a] determine the kind of the data required for this value
 	//	[b] convert the string we have stared at redisvals into the proper type
 	//	[c] store the converted data in the right field inside of cpd
+
 	cpd.ID = searchid
 	for i := 0; i < len(redisvals); i++ {
 		// sadly we have to capitalize the fields to export them and this means they do not match the source

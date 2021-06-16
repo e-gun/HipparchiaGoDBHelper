@@ -131,7 +131,7 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 
 	// [b] assign scores to each of them
 
-	scoremap := arrayfetchheadwordcounts(allheadwords, dbpool)
+	scoremap := fetchheadwordcounts(allheadwords, dbpool)
 
 	// [c] note that there are capital words in here that need lowering
 

@@ -39,6 +39,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	logiflogging(fmt.Sprintf("Bagger Module Launched"), loglevel, 1)
 	start := time.Now()
+	previous := time.Now()
 	logiflogging(fmt.Sprintf("Seeking to build *%s* bags of words", baggingmethod), loglevel, 2)
 
 	rc := grabredisconnection(rl)
@@ -95,8 +96,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	m := fmt.Sprintf("%d lines acquired", len(dblines))
 	rc.Set(key+"_statusmessage", m, redisexpiration)
-	m = m + fmt.Sprintf(" [A: %fs])", time.Now().Sub(start).Seconds())
-	logiflogging(fmt.Sprintf(m), loglevel, 3)
+	timetracker("A", m, start, previous, loglevel)
+	previous = time.Now()
 
 	// [b] turn them into a unified text block
 
@@ -116,8 +117,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	m = fmt.Sprintf("Unified text block built")
 	rc.Set(key+"_statusmessage", m, redisexpiration)
-	m = m + fmt.Sprintf(" [B: %fs])", time.Now().Sub(start).Seconds())
-	logiflogging(m, loglevel, 3)
+	timetracker("B", m, start, previous, loglevel)
+	previous = time.Now()
 
 	// [c] do some preliminary cleanups
 	// parsevectorsentences()
@@ -130,8 +131,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	m = fmt.Sprintf("Preliminary cleanups complete")
 	rc.Set(key+"_statusmessage", m, redisexpiration)
-	m = m + fmt.Sprintf(" [C: %fs]", time.Now().Sub(start).Seconds())
-	logiflogging(m, loglevel, 3)
+	timetracker("C", m, start, previous, loglevel)
+	previous = time.Now()
 
 	// [d] break the text into sentences and assemble []SentenceWithLocus
 
@@ -161,8 +162,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	m = fmt.Sprintf("Found %d sentences", len(sentences))
 	rc.Set(key+"_statusmessage", m, redisexpiration)
-	m = m + fmt.Sprintf(" [D: %fs]", time.Now().Sub(start).Seconds())
-	logiflogging(m, loglevel, 3)
+	timetracker("D", m, start, previous, loglevel)
+	previous = time.Now()
 
 	// unlemmatized bags of words customers have in fact reached their target as of now
 	if baggingmethod == "unlemmatized" {
@@ -191,8 +192,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	m = fmt.Sprintf("Found %d distinct words", len(allwords))
 	rc.Set(key+"_statusmessage", m, redisexpiration)
-	m = m + fmt.Sprintf(" [E: %fs]", time.Now().Sub(start).Seconds())
-	logiflogging(m, loglevel, 3)
+	timetracker("E", m, start, previous, loglevel)
+	previous = time.Now()
 
 	// [f] find all of the parsing info relative to these words
 
@@ -207,8 +208,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	m = fmt.Sprintf("Got morphology for %d terms", len(mo))
 	rc.Set(key+"_statusmessage", m, redisexpiration)
-	m = m + fmt.Sprintf(" [F: %fs]", time.Now().Sub(start).Seconds())
-	logiflogging(m, loglevel, 3)
+	timetracker("F", m, start, previous, loglevel)
+	previous = time.Now()
 
 	// [g] figure out which headwords to associate with the collection of words
 
@@ -230,7 +231,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 		// unpack the unique possibilities
 		pp := make([]MorphPossibility, 0, len(mo[m].UniqPossib))
 		for k := range mo[m].UniqPossib {
-			pp = append(pp, getpossiblemorph(m, k, pf))
+			pp = append(pp, parsepossiblemorph(m, k, pf))
 		}
 		// add them to the collection of possibilities or generate a new slot for them in the collection
 		for i := 0; i < len(pp); i++ {
@@ -257,8 +258,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	m = fmt.Sprintf("Built morphmap for %d terms", len(flatdict))
 	rc.Set(key+"_statusmessage", m, redisexpiration)
-	m = m + fmt.Sprintf(" [G: %fs]", time.Now().Sub(start).Seconds())
-	logiflogging(m, loglevel, 3)
+	timetracker("G", m, start, previous, loglevel)
+	previous = time.Now()
 
 	// [h] build the lemmatized bags of words
 
@@ -277,8 +278,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	m = fmt.Sprintf("Finished bagging %d bags", len(sentences))
 	rc.Set(key+"_statusmessage", m, redisexpiration)
-	m = m + fmt.Sprintf(" [H: %fs]", time.Now().Sub(start).Seconds())
-	logiflogging(m, loglevel, 3)
+	timetracker("H", m, start, previous, loglevel)
+	previous = time.Now()
 
 	// [i] purge stopwords
 	sentences = dropstopwords(headwordstoskip, sentences)
@@ -295,8 +296,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	m = fmt.Sprintf("Cleared stopwords: %d bags remain", len(sentences))
 	rc.Set(key+"_statusmessage", m, redisexpiration)
-	m = m + fmt.Sprintf(" [I: %fs]", time.Now().Sub(start).Seconds())
-	logiflogging(m, loglevel, 3)
+	timetracker("I", m, start, previous, loglevel)
+	previous = time.Now()
 
 	// [j] store...
 	kk := strings.Split(key, "_")
@@ -310,8 +311,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 
 	m = fmt.Sprintf("Finished loading")
 	rc.Set(key+"_statusmessage", m, redisexpiration)
-	m = m + fmt.Sprintf(" [J: %fs]", time.Now().Sub(start).Seconds())
-	logiflogging(m, loglevel, 1)
+	timetracker("J", m, start, previous, loglevel)
+	previous = time.Now()
 
 	rc.Set(key+"_poolofwork", -1, redisexpiration)
 	rc.Set(key+"_hitcount", 0, redisexpiration)
@@ -346,4 +347,10 @@ func loadthebags(resultkey string, goroutines int, sentences []SentenceWithLocus
 		go parallelredisloader(i, resultkey, bagsofbags[i], redisclient, &wg)
 	}
 	wg.Wait()
+}
+
+func timetracker(letter string, m string, start time.Time, previous time.Time, loglevel int) {
+	d := fmt.Sprintf("[Δ: %.3fs] ", time.Now().Sub(previous).Seconds())
+	m = fmt.Sprintf("[%s: %.3fs]", letter, time.Now().Sub(start).Seconds()) + d + m
+	logiflogging(m, loglevel, 3)
 }
