@@ -139,7 +139,7 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 
 func morphologyworker(wordlist []string, uselang string, workerid int, trialnumber int, dbpool *pgxpool.Pool) map[string]DbMorphology {
 	tt := "CREATE TEMPORARY TABLE ttw_%s AS SELECT words AS w FROM unnest(ARRAY[%s]) words"
-	qt := "SELECT observed_form, xrefs, prefixrefs, possible_dictionary_forms FROM %s_morphology WHERE EXISTS " +
+	qt := "SELECT observed_form, xrefs, prefixrefs, related_headwords FROM %s_morphology WHERE EXISTS " +
 		"(SELECT 1 FROM ttw_%s temptable WHERE temptable.w = %s_morphology.observed_form)"
 
 	rndid := strings.Replace(uuid.New().String(), "-", "", -1)
@@ -156,21 +156,7 @@ func morphologyworker(wordlist []string, uselang string, workerid int, trialnumb
 	// this error emerged when we moved over to goroutines
 	// the fix is to give each worker its own pool rather than to share: see "dbp := grabpgsqlconnection(pl, 1, 0)" above
 	// fortunately building the pools does not cost any real time
-	if e != nil {
-		// this is a workaround for the ERROR noted just above; but that error is allegedly fixed; NTL: the following does not hurt...
-		trialnumber += 1
-		// almost never see trial #2 & never saw #3
-		// logiflogging(fmt.Sprintf("%s failed to create a temptable [trial #%d]", rndid, trialnumber), 0, 0)
-		if trialnumber > maxtrials {
-			m := fmt.Sprintf("WARNING: morphologyworker worker#%d exhausted its tries to create a temptable [trial #%d]", workerid, trialnumber)
-			logiflogging(m, 0, 0)
-			m = "WARNING: your results will be INVALID: a substantial fraction of your words just vanished"
-			logiflogging(m, 0, 0)
-			return make(map[string]DbMorphology)
-		} else {
-			return morphologyworker(wordlist, uselang, workerid, trialnumber, dbpool)
-		}
-	}
+	checkerror(e)
 
 	foundmorph := make(map[string]DbMorphology)
 	defer foundrows.Close()
@@ -180,71 +166,10 @@ func morphologyworker(wordlist []string, uselang string, workerid int, trialnumb
 		var thehit DbMorphology
 		err = foundrows.Scan(&thehit.Observed, &thehit.Xrefs, &thehit.PefixXrefs, &thehit.RawPossib)
 		checkerror(err)
-		thehit.UniqPossib = make(map[string]bool)
-		if _, t := foundmorph[thehit.Observed]; t {
-			newpos := updatesetofpossibilities(thehit.RawPossib, thehit.UniqPossib)
-			for p := range newpos {
-				if _, t := foundmorph[thehit.Observed].UniqPossib[p]; !t {
-					foundmorph[thehit.Observed].UniqPossib[p] = true
-				}
-			}
-		} else {
-			thehit.UniqPossib = updatesetofpossibilities(thehit.RawPossib, thehit.UniqPossib)
-			foundmorph[thehit.Observed] = thehit
-		}
+		foundmorph[thehit.Observed] = thehit
 	}
 
 	return foundmorph
-}
-
-func updatesetofpossibilities(p string, known map[string]bool) map[string]bool {
-	// a new collection of possibilities has arrived <p1>xxx</p1><p2>yyy</p2>...
-	// parse this string for a list of possibilities; then add its elements to the set of known possibilities
-	// return the updated set
-
-	pf := regexp.MustCompile(`(<possibility_\d{1,2}>.*?</possibility_\d{1,2}>)`)
-	mm := pf.FindAllString(p, -1)
-	for i := 0; i < len(mm); i++ {
-		known[mm[i]] = true
-	}
-	return known
-}
-
-func parsepossiblemorph(o string, p string, pf *regexp.Regexp) MorphPossibility {
-	// pf := regexp.MustCompile(`(<possibility_(\d{1,2})>)(.*?)<xref_value>(.*?)</xref_value><xref_kind>(.*?)</xref_kind>(.*?)</possibility_\d{1,2}>`)
-
-	m := pf.FindStringSubmatchIndex(p)
-
-	// SAMPLE
-	// p := "<possibility_2>bellī, bellus<xref_value>8636495</xref_value><xref_kind>9</xref_kind><transl>A. pretty; B. every thing beautiful; A. Gallant; B. good</transl><analysis>masc nom/voc pl</analysis></possibility_2>"
-	// fmt.Printf("%d\n", m)
-	// [0 211 0 15 13 14 15 30 42 49 73 74 86 195]
-	// [0] 0 211: whole
-	// [2] 0 15: <possibility_2>
-	// [4] 13 14: 2
-	// [6] 15 30: bellī, bellus
-	// [8] 42 49: 8636495
-	//[10] 73 74: 9
-	//[12] 86 195: <transl>A. pretty; B. every thing beautiful; A. Gallant; B. good</transl><analysis>masc nom/voc pl</analysis>
-
-	// note that in [6] you need to take the second half after the comma: "bellus" and not "bellī, bellus": s := strings.Split(x, ",")
-
-	// should include a test to make sure len(m) will let us do the following? but m is nil if it won't fit the template?
-	var mp MorphPossibility
-	mp.Observed = o
-	x := p[m[6]:m[7]]
-	s := strings.Split(x, ",")
-	if len(s) == 1 {
-		mp.Entry = s[0]
-	} else {
-		mp.Entry = s[1]
-	}
-	mp.Entry = strings.TrimSpace(mp.Entry)
-	mp.Number = p[m[4]:m[5]]
-	mp.TrAnal = p[m[12]:m[13]]
-	mp.Xref = p[m[8]:m[9]]
-	// fmt.Printf("%s\n", mp)
-	return mp
 }
 
 func fetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[string]int {

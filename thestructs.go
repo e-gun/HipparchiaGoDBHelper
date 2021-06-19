@@ -71,15 +71,6 @@ type DbMorphology struct {
 	Xrefs      string
 	PefixXrefs string
 	RawPossib  string
-	UniqPossib map[string]bool
-}
-
-type MorphPossibility struct {
-	Observed string
-	Number   string
-	Entry    string
-	Xref     string
-	TrAnal   string
 }
 
 type CompositePollingData struct {

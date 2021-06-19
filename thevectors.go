@@ -211,52 +211,19 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	timetracker("F", m, start, previous, loglevel)
 	previous = time.Now()
 
-	// [g] figure out which headwords to associate with the collection of words
-
-	// see convertmophdicttodict()
-	// a set of sets
-	//	key = word-in-use
-	//	value = { maybeA, maybeB, maybeC}
+	// [G] figure out which headwords to associate with the collection of words
+	// this information now already inside of DbMorphology.RawPossib which grabs "related_headwords" from the DB table
+	// a set of sets, as it were:
+	//		key = word-in-use
+	//		value = { maybeA, maybeB, maybeC}
 	// {'θεῶν': {'θεόϲ', 'θέα', 'θεάω', 'θεά'}, 'πώ': {'πω'}, 'πολλά': {'πολύϲ'}, 'πατήρ': {'πατήρ'}, ... }
 
-	morphdict := make(map[string]map[string]bool)
-
-	// see the example at https://golang.org/pkg/regexp/
-	// this regex matches the python for good/ill...
-	// avoid looping the compilation and save big
-	// [HGH] Built morphmap for 54958 terms [G: 4.822822s] vs [HGH] Built morphmap for 54958 terms [G: 2.967299s]
-	pf := regexp.MustCompile(`(<possibility_(\d{1,2})>)(.*?)<xref_value>(.*?)</xref_value><xref_kind>(.*?)</xref_kind>(.*?)</possibility_\d{1,2}>`)
-
+	morphdict := make(map[string][]string, len(mo))
 	for m := range mo {
-		// unpack the unique possibilities
-		pp := make([]MorphPossibility, 0, len(mo[m].UniqPossib))
-		for k := range mo[m].UniqPossib {
-			pp = append(pp, parsepossiblemorph(m, k, pf))
-		}
-		// add them to the collection of possibilities or generate a new slot for them in the collection
-		for i := 0; i < len(pp); i++ {
-			if _, t := morphdict[pp[i].Observed]; t {
-				// X is already present in 'morphdict'; need to add this headword to the set of headwords
-				morphdict[pp[i].Observed][pp[i].Entry] = true
-			} else {
-				// ὑπέρ-ἀθλέω and ἀνά-τίω are in here: if you "fix" them you you won't be left with a proper headword anyway...
-				morphdict[pp[i].Observed] = make(map[string]bool)
-				morphdict[pp[i].Observed][pp[i].Entry] = true
-			}
-		}
+		morphdict[m] = strings.Split(mo[m].RawPossib, " ")
 	}
 
-	// no need for the "bool" any longer; demap things
-	flatdict := make(map[string][]string, len(morphdict))
-	for i := range morphdict {
-		thekeys := make([]string, 0, len(morphdict[i]))
-		for k := range morphdict[i] {
-			thekeys = append(thekeys, k)
-		}
-		flatdict[i] = thekeys
-	}
-
-	m = fmt.Sprintf("Built morphmap for %d terms", len(flatdict))
+	m = fmt.Sprintf("Built morphmap for %d terms", len(morphdict))
 	rc.Set(key+"_statusmessage", m, redisexpiration)
 	timetracker("G", m, start, previous, loglevel)
 	previous = time.Now()
@@ -266,11 +233,11 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	switch baggingmethod {
 	// see vectorparsingandbagging.go
 	case "flat":
-		sentences = buildflatbagsofwords(sentences, flatdict)
+		sentences = buildflatbagsofwords(sentences, morphdict)
 	case "alternates":
-		sentences = buildcompositebagsofwords(sentences, flatdict)
+		sentences = buildcompositebagsofwords(sentences, morphdict)
 	case "winnertakesall":
-		sentences = buildwinnertakesallbagsofwords(sentences, flatdict, dbpool)
+		sentences = buildwinnertakesallbagsofwords(sentences, morphdict, dbpool)
 	default:
 		m = fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", baggingmethod)
 		logiflogging(m, loglevel, 0)
@@ -299,7 +266,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	timetracker("I", m, start, previous, loglevel)
 	previous = time.Now()
 
-	// [j] store...
+	// [J] store...
 	kk := strings.Split(key, "_")
 	resultkey := kk[0] + "_vectorresults"
 
