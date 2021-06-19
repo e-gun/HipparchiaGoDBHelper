@@ -211,7 +211,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	timetracker("F", m, start, previous, loglevel)
 	previous = time.Now()
 
-	// [G] figure out which headwords to associate with the collection of words
+	// [g] figure out which headwords to associate with the collection of words
 	// this information now already inside of DbMorphology.RawPossib which grabs "related_headwords" from the DB table
 	// a set of sets, as it were:
 	//		key = word-in-use
