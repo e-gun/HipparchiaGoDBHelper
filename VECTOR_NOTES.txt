@@ -189,3 +189,27 @@ after pre-building the possibilities inside of the database...
 [HGH] [I: 2.290s][Δ: 0.138s] Cleared stopwords: 66661 bags remain
 [HGH] [J: 3.696s][Δ: 1.406s] Finished loading
 bags have been stored at _vectorresults%
+
+
+Ubuntu
+
+ % date && ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" -t 5 -p ${L} && date
+
+Sun Jun 20 02:49:21 PM UTC 2021
+[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.2.0b) [loglevel=3]
+[HGH] Bagger Module Launched
+[HGH] Seeking to build *winnertakesall* bags of words
+[HGH] Connected to redis
+[HGH] Connected to hipparchiaDB on PostgreSQL
+[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
+[HGH] [A: 0.203s][Δ: 0.203s] 139997 lines acquired
+[HGH] [B: 0.265s][Δ: 0.062s] Unified text block built
+[HGH] [C: 0.395s][Δ: 0.130s] Preliminary cleanups complete
+[HGH] [D: 1.392s][Δ: 0.996s] Found 68790 sentences
+[HGH] [E: 1.453s][Δ: 0.061s] Found 80125 distinct words
+[HGH] [F: 1.788s][Δ: 0.335s] Got morphology for 73819 terms
+[HGH] [G: 1.801s][Δ: 0.013s] Built morphmap for 73819 terms
+[HGH] [H: 2.141s][Δ: 0.340s] Finished bagging 68790 bags
+[HGH] [I: 2.279s][Δ: 0.138s] Cleared stopwords: 66664 bags remain
+[HGH] [J: 2.693s][Δ: 0.415s] Finished loading
+bags have been stored at _vectorresultsSun Jun 20 02:49:24 PM UTC 2021

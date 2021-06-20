@@ -198,13 +198,13 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	// [f] find all of the parsing info relative to these words
 
 	// can only send the keys to getrequiredmorphobjects(); so we need to demap things
-	keys := make([]string, 0, len(allwords))
-	for k := range allwords {
-		keys = append(keys, k)
+	thewords := make([]string, 0, len(allwords))
+	for w := range allwords {
+		thewords = append(thewords, w)
 	}
 
 	var mo map[string]DbMorphology
-	mo = getrequiredmorphobjects(keys, goroutines, pl)
+	mo = getrequiredmorphobjects(thewords, goroutines, pl)
 
 	m = fmt.Sprintf("Got morphology for %d terms", len(mo))
 	rc.Set(key+"_statusmessage", m, redisexpiration)
@@ -221,6 +221,18 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	morphdict := make(map[string][]string, len(mo))
 	for m := range mo {
 		morphdict[m] = strings.Split(mo[m].RawPossib, " ")
+	}
+
+	// [HGH] [E: 1.453s][Δ: 0.061s] Found 80125 distinct words
+	// [HGH] [F: 1.788s][Δ: 0.335s] Got morphology for 73819 terms
+	// if you just iterate over mo, you drop unparsed terms: retain them
+
+	for w := range allwords {
+		if _, t := morphdict[w]; t {
+			continue
+		} else {
+			morphdict[w] = []string{w}
+		}
 	}
 
 	m = fmt.Sprintf("Built morphmap for %d terms", len(morphdict))
