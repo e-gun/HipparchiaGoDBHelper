@@ -282,10 +282,6 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	kk := strings.Split(key, "_")
 	resultkey := kk[0] + "_vectorresults"
 
-	//for i := 0; i < 5; i++ {
-	//	logiflogging(fmt.Sprintf("b #%d: %s", i, sentences[i]), loglevel, 5)
-	//}
-
 	loadthebags(resultkey, goroutines, sentences, rc)
 
 	m = fmt.Sprintf("Finished loading")

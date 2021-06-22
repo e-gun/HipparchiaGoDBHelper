@@ -27,6 +27,7 @@ func stripper(item string, purge []string) string {
 
 func makesubstitutions(text string) string {
 	// https://golang.org/pkg/strings/#NewReplacer
+	// cf cleanvectortext() in vectorhelpers.py
 	swap := strings.NewReplacer("v", "u", "j", "i", "σ", "ϲ", "ς", "ϲ", "A.", "Aulus", "App.", "Appius",
 		"C.", "Caius", "G.", "Gaius", "Cn.", "Cnaius", "Gn.", "Gnaius", "D.", "Decimus", "L.", "Lucius", "M.", "Marcus",
 		"M.’", "Manius", "N.", "Numerius", "P.", "Publius", "Q.", "Quintus", "S.", "Spurius", "Sp.", "Spurius",
@@ -45,6 +46,13 @@ func splitonpunctuaton(text string) []string {
 	swap := strings.NewReplacer("?", ".", "!", ".", "·", ".", ";", ".")
 	text = swap.Replace(text)
 	split := strings.Split(text, ".")
+
+	// slower way of doing the same...
+
+	//re := regexp.MustCompile("[?!;·]")
+	//text = re.ReplaceAllString(text, ".")
+	//split := strings.Split(text, ".")
+
 	return split
 }
 
@@ -129,11 +137,11 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 		}
 	}
 
-	// [b] assign scores to each of them
+	// [b] generate scoremap and assign scores to each of the headwords
 
 	scoremap := fetchheadwordcounts(allheadwords, dbpool)
 
-	// [c] note that there are capital words in here that need lowering
+	// [c] note that there are capital words in the parsemap that need lowering
 
 	// [c1] lower the internal values first
 	for i := range parsemap {
@@ -142,7 +150,7 @@ func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[strin
 		}
 	}
 
-	// [c2] lower the keys; how worried should we be about the collisions...
+	// [c2] lower the parsemap keys; how worried should we be about the collisions...
 	lcparsemap := make(map[string][]string)
 	for i := range parsemap {
 		lcparsemap[strings.ToLower(i)] = parsemap[i]
