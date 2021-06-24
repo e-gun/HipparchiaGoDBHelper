@@ -20,10 +20,14 @@ var (
 //
 
 func grabredisconnection(rl RedisLogin) redis.Conn {
+	// to test that we really are pooling:
+	// if you uncomment the two Printfs you will see one and only one "called" vs multiple "grabbed"
 	if RedisPool == nil {
 		poolinit(rl)
+		// fmt.Printf("poolinit() called\n")
 	}
 	connection := RedisPool.Get()
+	// fmt.Printf("connection grabbed\n")
 	return connection
 }
 

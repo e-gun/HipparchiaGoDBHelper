@@ -44,7 +44,11 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	logiflogging(fmt.Sprintf("Seeking to build *%s* bags of words", baggingmethod), loglevel, 2)
 
 	rc := grabredisconnection(rl)
-	defer rc.Close()
+	defer func(rc redis.Conn) {
+		err := rc.Close()
+		checkerror(err)
+	}(rc)
+
 	logiflogging(fmt.Sprintf("Connected to redis"), loglevel, 2)
 
 	dbpool := grabpgsqlconnection(pl, goroutines, loglevel)
@@ -330,6 +334,10 @@ func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocu
 	//}
 
 	rc := grabredisconnection(rl)
+	defer func(rc redis.Conn) {
+		err := rc.Close()
+		checkerror(err)
+	}(rc)
 
 	for i := 0; i < len(bags); i++ {
 		jsonhit, err := sonic.Marshal(bags[i])
