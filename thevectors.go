@@ -24,7 +24,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	// "github.com/bytedance/sonic"
 	"github.com/gomodule/redigo/redis"
 	"os"
 	"regexp"
@@ -340,11 +339,23 @@ func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocu
 		checkerror(err)
 	}(rc)
 
+	// pipleline it...
+	// https://pkg.go.dev/github.com/gomodule/redigo/redis#hdr-Pipelining
+	// 	Connections support pipelining using the Send, Flush and Receive methods.
+
+	err := rc.Send("MULTI")
+	checkerror(err)
+
 	for i := 0; i < len(bags); i++ {
-		jsonhit, err := json.Marshal(bags[i])
-		checkerror(err)
-		rcsadd(rc, resultkey, jsonhit)
+		jsonhit, ee := json.Marshal(bags[i])
+		checkerror(ee)
+
+		e := rc.Send("SADD", resultkey, jsonhit)
+		checkerror(e)
 	}
+
+	_, e := rc.Do("EXEC")
+	checkerror(e)
 
 	wg.Done()
 }

@@ -16,7 +16,6 @@ import (
 	"C"
 	"encoding/json"
 	"fmt"
-	// "github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"github.com/gomodule/redigo/redis"
 	"gopkg.in/olahol/melody.v1"
