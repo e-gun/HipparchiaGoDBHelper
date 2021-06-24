@@ -7,9 +7,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/go-redis/redis"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"regexp"
@@ -218,22 +216,4 @@ func fetchheadwordcounts(headwordset map[string]bool, dbpool *pgxpool.Pool) map[
 	}
 
 	return returnmap
-}
-
-func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocus, redisclient *redis.Client, wg *sync.WaitGroup) {
-	// make sure that "0" comes in last so you can watch the parallelism
-	//if workerid == 0 {
-	//	time.Sleep(pollinginterval)
-	//	time.Sleep(pollinginterval)
-	//}
-
-	// it is faster to pass a client here than it is to fetch a new one...
-
-	for i := 0; i < len(bags); i++ {
-		jsonhit, err := json.Marshal(bags[i])
-		checkerror(err)
-		redisclient.SAdd(resultkey, jsonhit)
-	}
-
-	wg.Done()
 }

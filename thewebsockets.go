@@ -14,11 +14,11 @@ package main
 
 import (
 	"C"
-	// "encoding/json"
 	"fmt"
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis"
+	"github.com/gomodule/redigo/redis"
+	// "github.com/go-redis/redis"
 	"gopkg.in/olahol/melody.v1"
 	"reflect"
 	"regexp"
@@ -115,12 +115,13 @@ func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving
 	}
 }
 
-func retrievepollingdata(searchid string, rediskeys [8]string, loglevel int, rc *redis.Client) [8]string {
+func retrievepollingdata(searchid string, rediskeys [8]string, loglevel int, rc redis.Conn) [8]string {
 	// grab the data from redis
 	var redisvals [8]string
 	var err error
 	for i := 0; i < len(rediskeys); i++ {
-		redisvals[i], err = rc.Get(fmt.Sprintf("%s_%s", searchid, rediskeys[i])).Result()
+		k := fmt.Sprintf("%s_%s", searchid, rediskeys[i])
+		redisvals[i], err = redis.String(rc.Do("GET", k))
 		if err != nil {
 			// checkerror(err) will yield "panic: redis: nil"
 			redisvals[i] = ""
@@ -187,13 +188,26 @@ func typeconvertpollingdata(searchid string, rediskeys [8]string, redisvals [8]s
 	return cpd
 }
 
-func deletewhendone(searchid string, rediskeys [8]string, loglevel int, rc *redis.Client) {
+//func deletewhendone(searchid string, rediskeys [8]string, loglevel int, rc *redis.Client) {
+//	// make sure that the "there is no work" message gets propagated
+//	rc.Set(searchid+"_poolofwork", -1, redisexpiration)
+//	time.Sleep(pollinginterval)
+//	// get rid of the polling keys
+//	for i := 0; i < len(rediskeys); i++ {
+//		_, _ = rc.Del(fmt.Sprintf("%s_%s", searchid, rediskeys[i])).Result()
+//	}
+//	logiflogging(fmt.Sprintf("deleted redis keys for %s", searchid), loglevel, 2)
+//}
+
+func deletewhendone(searchid string, rediskeys [8]string, loglevel int, rc redis.Conn) {
 	// make sure that the "there is no work" message gets propagated
-	rc.Set(searchid+"_poolofwork", -1, redisexpiration)
+	p := fmt.Sprintf("%s_poolofwork", searchid)
+	_, _ = rc.Do("SET", p, -1)
 	time.Sleep(pollinginterval)
 	// get rid of the polling keys
 	for i := 0; i < len(rediskeys); i++ {
-		_, _ = rc.Del(fmt.Sprintf("%s_%s", searchid, rediskeys[i])).Result()
+		k := fmt.Sprintf("%s_%s", searchid, rediskeys[i])
+		_, _ = rc.Do("DEL", k)
 	}
 	logiflogging(fmt.Sprintf("deleted redis keys for %s", searchid), loglevel, 2)
 }

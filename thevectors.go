@@ -23,7 +23,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-redis/redis"
+	// "github.com/go-redis/redis"
+	"github.com/bytedance/sonic"
+	"github.com/gomodule/redigo/redis"
 	"os"
 	"regexp"
 	"strings"
@@ -36,7 +38,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	loglevel int, headwordstoskip string, inflectedtoskip string, rl RedisLogin, pl PostgresLogin) string {
 	// this does not work at the moment if called as a python module
 	// but HipparchiaServer does not know how to call it either...
-
+	smk := key + "_statusmessage"
 	logiflogging(fmt.Sprintf("Bagger Module Launched"), loglevel, 1)
 	start := time.Now()
 	previous := time.Now()
@@ -46,18 +48,15 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	defer rc.Close()
 	logiflogging(fmt.Sprintf("Connected to redis"), loglevel, 2)
 
-	// turn off progress logging
-	rc.Set(key+"_poolofwork", -1, redisexpiration)
-	rc.Set(key+"_hitcount", 0, redisexpiration)
-
 	dbpool := grabpgsqlconnection(pl, goroutines, loglevel)
 	defer dbpool.Close()
 
 	// [a] grab the db lines
 	// we do this by copying the code inside of grabber but just cut out the storage bits: not DRY, but...
-	remain, err := rc.SCard(key).Result()
-	checkerror(err)
-	rc.Set(key+"_poolofwork", remain, redisexpiration)
+
+	remain, e := redis.Int64(rc.Do("SCARD", key))
+	checkerror(e)
+	rcsetint(rc, key+"_poolofwork", remain)
 
 	dblines := make(map[int]DbWorkline)
 
@@ -68,7 +67,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 		count := 0
 		for {
 			// [i] get a pre-rolled or break the loop
-			thequery, err := rc.SPop(key).Result()
+			thequery, err := redis.String(rc.Do("SPOP", key))
 			if err != nil {
 				break
 			}
@@ -81,7 +80,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 			for foundrows.Next() {
 				count += 1
 				if count%1000 == 0 {
-					rc.Set(key+"_hitcount", count, redisexpiration)
+					rcsetint(rc, key+"_hitcount", int64(count))
 				}
 				// convert the find to a DbWorkline
 				var thehit DbWorkline
@@ -95,7 +94,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	}
 
 	m := fmt.Sprintf("%d lines acquired", len(dblines))
-	rc.Set(key+"_statusmessage", m, redisexpiration)
+	rcsetstr(rc, smk, m)
 	timetracker("A", m, start, previous, loglevel)
 	previous = time.Now()
 
@@ -116,7 +115,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	sb.Reset()
 
 	m = fmt.Sprintf("Unified text block built")
-	rc.Set(key+"_statusmessage", m, redisexpiration)
+	rcsetstr(rc, smk, m)
 	timetracker("B", m, start, previous, loglevel)
 	previous = time.Now()
 
@@ -130,7 +129,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	thetext = makesubstitutions(thetext)
 
 	m = fmt.Sprintf("Preliminary cleanups complete")
-	rc.Set(key+"_statusmessage", m, redisexpiration)
+	rcsetstr(rc, smk, m)
 	timetracker("C", m, start, previous, loglevel)
 	previous = time.Now()
 
@@ -161,7 +160,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	}
 
 	m = fmt.Sprintf("Found %d sentences", len(sentences))
-	rc.Set(key+"_statusmessage", m, redisexpiration)
+	rcsetstr(rc, smk, m)
 	timetracker("D", m, start, previous, loglevel)
 	previous = time.Now()
 
@@ -170,7 +169,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 		sentences = dropstopwords(inflectedtoskip, sentences)
 		kk := strings.Split(key, "_")
 		resultkey := kk[0] + "_vectorresults"
-		loadthebags(resultkey, goroutines, sentences, rc)
+		loadthebags(resultkey, goroutines, sentences, rl)
 		// DO NO comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer
 		// "resultrediskey = resultrediskey.split()[-1]"
 		fmt.Println(fmt.Sprintf("%d %s bags of words stored at %s", len(sentences), baggingmethod, resultkey))
@@ -191,7 +190,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	}
 
 	m = fmt.Sprintf("Found %d distinct words", len(allwords))
-	rc.Set(key+"_statusmessage", m, redisexpiration)
+	rcsetstr(rc, smk, m)
 	timetracker("E", m, start, previous, loglevel)
 	previous = time.Now()
 
@@ -207,7 +206,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	mo = getrequiredmorphobjects(thewords, goroutines, pl)
 
 	m = fmt.Sprintf("Got morphology for %d terms", len(mo))
-	rc.Set(key+"_statusmessage", m, redisexpiration)
+	rcsetstr(rc, smk, m)
 	timetracker("F", m, start, previous, loglevel)
 	previous = time.Now()
 
@@ -236,7 +235,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	}
 
 	m = fmt.Sprintf("Built morphmap for %d terms", len(morphdict))
-	rc.Set(key+"_statusmessage", m, redisexpiration)
+	rcsetstr(rc, smk, m)
 	timetracker("G", m, start, previous, loglevel)
 	previous = time.Now()
 
@@ -256,7 +255,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	}
 
 	m = fmt.Sprintf("Finished bagging %d bags", len(sentences))
-	rc.Set(key+"_statusmessage", m, redisexpiration)
+	rcsetstr(rc, smk, m)
 	timetracker("H", m, start, previous, loglevel)
 	previous = time.Now()
 
@@ -274,7 +273,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	sentences = clearedlist
 
 	m = fmt.Sprintf("Cleared stopwords: %d bags remain", len(sentences))
-	rc.Set(key+"_statusmessage", m, redisexpiration)
+	rcsetstr(rc, smk, m)
 	timetracker("I", m, start, previous, loglevel)
 	previous = time.Now()
 
@@ -282,20 +281,20 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	kk := strings.Split(key, "_")
 	resultkey := kk[0] + "_vectorresults"
 
-	loadthebags(resultkey, goroutines, sentences, rc)
+	loadthebags(resultkey, goroutines, sentences, rl)
 
 	m = fmt.Sprintf("Finished loading")
-	rc.Set(key+"_statusmessage", m, redisexpiration)
+	rcsetstr(rc, smk, m)
 	timetracker("J", m, start, previous, loglevel)
 	previous = time.Now()
 
-	rc.Set(key+"_poolofwork", -1, redisexpiration)
-	rc.Set(key+"_hitcount", 0, redisexpiration)
+	rcsetint(rc, key+"_poolofwork", -1)
+	rcsetint(rc, key+"_hitcount", 0)
 
 	return resultkey
 }
 
-func loadthebags(resultkey string, goroutines int, sentences []SentenceWithLocus, redisclient *redis.Client) {
+func loadthebags(resultkey string, goroutines int, sentences []SentenceWithLocus, rl RedisLogin) {
 	totalwork := len(sentences)
 	chunksize := totalwork / goroutines
 	leftover := totalwork % goroutines
@@ -319,9 +318,27 @@ func loadthebags(resultkey string, goroutines int, sentences []SentenceWithLocus
 	var wg sync.WaitGroup
 	for i := 0; i < goroutines; i++ {
 		wg.Add(1)
-		go parallelredisloader(i, resultkey, bagsofbags[i], redisclient, &wg)
+		go parallelredisloader(i, resultkey, bagsofbags[i], rl, &wg)
 	}
 	wg.Wait()
+}
+
+func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocus, rl RedisLogin, wg *sync.WaitGroup) {
+	// make sure that "0" comes in last so you can watch the parallelism
+	//if workerid == 0 {
+	//	time.Sleep(pollinginterval)
+	//	time.Sleep(pollinginterval)
+	//}
+
+	rc := grabredisconnection(rl)
+
+	for i := 0; i < len(bags); i++ {
+		jsonhit, err := sonic.Marshal(bags[i])
+		checkerror(err)
+		rcsadd(rc, resultkey, jsonhit)
+	}
+
+	wg.Done()
 }
 
 func timetracker(letter string, m string, start time.Time, previous time.Time, loglevel int) {
