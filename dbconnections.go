@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	// "github.com/go-redis/redis"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"os"
@@ -12,20 +11,13 @@ import (
 	"time"
 )
 
-//func grabredisconnection(rl RedisLogin) *redis.Client {
-//	redisclient := redis.NewClient(&redis.Options{Addr: rl.Addr, Password: rl.Password, DB: rl.DB})
-//	_, err := redisclient.Ping().Result()
-//	checkerror(err)
-//	return redisclient
-//}
+var (
+	RedisPool *redis.Pool
+)
 
 //
 // REDIS
 //
-
-var (
-	RedisPool *redis.Pool
-)
 
 func grabredisconnection(rl RedisLogin) redis.Conn {
 	if RedisPool == nil {
@@ -82,28 +74,13 @@ func rcsetstr(c redis.Conn, k string, v string) {
 	checkerror(err)
 }
 
-//func rscard(c redis.Conn, k string) int {
-//	reply, err := redis.Values(c.Do("SCARD", k))
-//	checkerror(err)
-//
-//	var n int
-//	_, e := redis.Scan(reply, &n)
-//	checkerror(e)
-//
-//	return n
-//}
-//
-//func rpopstring(c redis.Conn, k string) string {
-//	var thequery string
-//	reply, err := redis.Values(c.Do("SPOP", k))
-//	if err != nil {
-//		thequery = "SET_IS_EMPTY"
-//	}
-//
-//	_, e := redis.Scan(reply, &thequery)
-//	checkerror(e)
-//	return thequery
-//}
+func rcpopstr(c redis.Conn, k string) string {
+	s, err := redis.String(c.Do("SPOP", k))
+	if err != nil {
+		s = "SET_IS_EMPTY"
+	}
+	return s
+}
 
 //
 // POSTGRESQL
@@ -124,9 +101,9 @@ func grabpgsqlconnection(pl PostgresLogin, workers int, loglevel int) *pgxpool.P
 	config.MinConns = int32(workers + 2)
 
 	// the boring way if you don't want to go via pgxpool.ParseConfig(url)
-	// dbpool, err := pgxpool.Connect(context.Background(), url)
+	// pooledconnection, err := pgxpool.Connect(context.Background(), url)
 
-	dbpool, err := pgxpool.ConnectConfig(context.Background(), config)
+	pooledconnection, err := pgxpool.ConnectConfig(context.Background(), config)
 
 	if err != nil {
 		logiflogging(fmt.Sprintf("Could not connect to PostgreSQL via %s", url), loglevel, 0)
@@ -135,5 +112,5 @@ func grabpgsqlconnection(pl PostgresLogin, workers int, loglevel int) *pgxpool.P
 
 	logiflogging(fmt.Sprintf("Connected to %s on PostgreSQL", pl.DBName), loglevel, 2)
 
-	return dbpool
+	return pooledconnection
 }

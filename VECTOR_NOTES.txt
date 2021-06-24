@@ -171,25 +171,23 @@ Wed Jun 16 03:12:11 PM UTC 2021
 
 after pre-building the possibilities inside of the database...
 
-% ./HipparchiaGoDBHelper -sv -l 3 -t 5 -svdb lt0474 -svs 1 -sve 149570
-
-[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.2.0) [loglevel=3]
-[HGH] Bagger Module Launched
-[HGH] Seeking to build *winnertakesall* bags of words
-[HGH] Connected to redis
-[HGH] Connected to hipparchiaDB on PostgreSQL
-[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
-[HGH] [A: 0.203s][Δ: 0.203s] 149570 lines acquired
-[HGH] [B: 0.310s][Δ: 0.106s] Unified text block built
-[HGH] [C: 0.475s][Δ: 0.166s] Preliminary cleanups complete
-[HGH] [D: 1.494s][Δ: 1.019s] Found 73023 sentences
-[HGH] [E: 1.560s][Δ: 0.065s] Found 83301 distinct words
-[HGH] [F: 1.944s][Δ: 0.384s] Got morphology for 76492 terms
-[HGH] [G: 1.973s][Δ: 0.029s] Built morphmap for 83469 terms
-[HGH] [H: 2.354s][Δ: 0.381s] Finished bagging 73023 bags
-[HGH] [I: 2.518s][Δ: 0.164s] Cleared stopwords: 71833 bags remain
-[HGH] [J: 3.838s][Δ: 1.321s] Finished loading
-bags have been stored at _vectorresults%
+% ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" -t 5 -p ${L}
+  [HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.2.1) [loglevel=3]
+  [HGH] Bagger Module Launched
+  [HGH] Seeking to build *winnertakesall* bags of words
+  [HGH] Connected to redis
+  [HGH] Connected to hipparchiaDB on PostgreSQL
+  [HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
+  [HGH] [A: 0.209s][Δ: 0.209s] 139997 lines acquired
+  [HGH] [B: 0.289s][Δ: 0.080s] Unified text block built
+  [HGH] [C: 0.440s][Δ: 0.151s] Preliminary cleanups complete
+  [HGH] [D: 1.408s][Δ: 0.968s] Found 68790 sentences
+  [HGH] [E: 1.467s][Δ: 0.059s] Found 80125 distinct words
+  [HGH] [F: 1.855s][Δ: 0.389s] Got morphology for 73819 terms
+  [HGH] [G: 1.884s][Δ: 0.029s] Built morphmap for 80290 terms
+  [HGH] [H: 2.252s][Δ: 0.368s] Finished bagging 68790 bags
+  [HGH] [I: 2.399s][Δ: 0.147s] Cleared stopwords: 67639 bags remain
+  [HGH] [J: 3.603s][Δ: 1.204s] Finished loading
 
 Ubuntu
 

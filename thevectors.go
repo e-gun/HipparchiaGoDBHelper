@@ -23,7 +23,6 @@ package main
 
 import (
 	"fmt"
-	// "github.com/go-redis/redis"
 	"github.com/bytedance/sonic"
 	"github.com/gomodule/redigo/redis"
 	"os"

@@ -15,10 +15,8 @@ package main
 
 import (
 	"context"
-	// "encoding/json"
 	"fmt"
 	"github.com/bytedance/sonic"
-	// "github.com/go-redis/redis"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -54,7 +52,10 @@ func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisL
 	logiflogging(fmt.Sprintf("Hello from grabber %d", clientnumber), ll, 3)
 
 	rc := grabredisconnection(rl)
-	defer rc.Close()
+	defer func(rc redis.Conn) {
+		err := rc.Close()
+		checkerror(err)
+	}(rc)
 
 	dbpool := grabpgsqlconnection(pl, 1, ll)
 	defer dbpool.Close()
@@ -63,8 +64,10 @@ func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisL
 
 	for {
 		// [i] get a pre-rolled query or break the loop
-		thequery, err := redis.String(rc.Do("GET", searchkey))
-		checkerror(err)
+		thequery := rcpopstr(rc, searchkey)
+		if thequery == "SET_IS_EMPTY" {
+			break
+		}
 
 		// [ii] - [v] inside findtherows() because its code is common with HipparchiaBagger's needs
 		foundrows := findtherows(thequery, "grabber", searchkey, clientnumber, ll, rc, dbpool)
@@ -74,7 +77,7 @@ func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisL
 		for foundrows.Next() {
 			// [vi.1] convert the find to a DbWorkline
 			var thehit DbWorkline
-			err = foundrows.Scan(&thehit.WkUID, &thehit.TbIndex, &thehit.Lvl5Value, &thehit.Lvl4Value, &thehit.Lvl3Value,
+			err := foundrows.Scan(&thehit.WkUID, &thehit.TbIndex, &thehit.Lvl5Value, &thehit.Lvl4Value, &thehit.Lvl3Value,
 				&thehit.Lvl2Value, &thehit.Lvl1Value, &thehit.Lvl0Value, &thehit.MarkedUp, &thehit.Accented,
 				&thehit.Stripped, &thehit.Hypenated, &thehit.Annotations)
 			checkerror(err)
@@ -142,7 +145,12 @@ func findtherows(thequery string, thecaller string, searchkey string, clientnumb
 
 func recordinitialsizeofworkpile(k string, loglevel int, rl RedisLogin) {
 	rc := grabredisconnection(rl)
-	defer rc.Close()
+
+	defer func(rc redis.Conn) {
+		err := rc.Close()
+		checkerror(err)
+	}(rc)
+
 	remain, err := redis.Int64(rc.Do("SCARD", k))
 	checkerror(err)
 	kk := fmt.Sprintf("%s_poolofwork", k)
@@ -154,7 +162,12 @@ func recordinitialsizeofworkpile(k string, loglevel int, rl RedisLogin) {
 
 func fetchfinalnumberofresults(k string, rl RedisLogin) int64 {
 	rc := grabredisconnection(rl)
-	defer rc.Close()
+
+	defer func(rc redis.Conn) {
+		err := rc.Close()
+		checkerror(err)
+	}(rc)
+
 	kk := fmt.Sprintf("%s_results", k)
 	hits, err := redis.Int64(rc.Do("SCARD", kk))
 	checkerror(err)
