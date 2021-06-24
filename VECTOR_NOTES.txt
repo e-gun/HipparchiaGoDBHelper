@@ -24,8 +24,11 @@ b('', 'winnertakesall', 5, 'lt0448', 1, 26, 3, '', '', r, p)
 
 
 output:
+
+[works with v.1.2.0]
 [panics as of v.1.2.1]
-[works with v.1.2.0]['sonic' looks like it is the issue]
+[works with v.1.2.2]['sonic' broke things: back to "encoding/json"]
+
 
 >>> b('', 'winnertakesall', 5, 'lt0474', 1, 140000, 5, '', '', r, p)
 [HGH] Bagger Module Launched
@@ -33,16 +36,16 @@ output:
 [HGH] Connected to redis
 [HGH] Connected to hipparchiaDB on PostgreSQL
 [HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
-[HGH] [A: 0.313s][Δ: 0.313s] 140000 lines acquired
-[HGH] [B: 0.404s][Δ: 0.091s] Unified text block built
-[HGH] [C: 0.563s][Δ: 0.159s] Preliminary cleanups complete
-[HGH] [D: 1.662s][Δ: 1.099s] Found 68790 sentences
-[HGH] [E: 1.729s][Δ: 0.066s] Found 80125 distinct words
-[HGH] [F: 2.180s][Δ: 0.451s] Got morphology for 73819 terms
-[HGH] [G: 2.213s][Δ: 0.033s] Built morphmap for 80290 terms
-[HGH] [H: 2.603s][Δ: 0.390s] Finished bagging 68790 bags
-[HGH] [I: 2.762s][Δ: 0.160s] Cleared stopwords: 68005 bags remain
-[HGH] [J: 4.278s][Δ: 1.516s] Finished loading
+[HGH] [A: 0.331s][Δ: 0.331s] 140000 lines acquired
+[HGH] [B: 0.416s][Δ: 0.085s] Unified text block built
+[HGH] [C: 0.569s][Δ: 0.153s] Preliminary cleanups complete
+[HGH] [D: 1.582s][Δ: 1.013s] Found 68790 sentences
+[HGH] [E: 1.652s][Δ: 0.070s] Found 80125 distinct words
+[HGH] [F: 2.058s][Δ: 0.406s] Got morphology for 73819 terms
+[HGH] [G: 2.088s][Δ: 0.030s] Built morphmap for 80290 terms
+[HGH] [H: 2.454s][Δ: 0.366s] Finished bagging 68790 bags
+[HGH] [I: 2.597s][Δ: 0.144s] Cleared stopwords: 68005 bags remain
+[HGH] [J: 3.896s][Δ: 1.299s] Finished loading
 '_vectorresults'
 
 

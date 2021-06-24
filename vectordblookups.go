@@ -107,11 +107,12 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 		wg.Add(1)
 		// "i" will be captured if sent into the function
 		j := i
-		dbp := grabpgsqlconnection(pl, 1, 0)
-		go func(wordlist []string, uselang string, workerid int, dbp *pgxpool.Pool) {
+		go func(wordlist []string, uselang string, workerid int, pl PostgresLogin) {
 			defer wg.Done()
+			dbp := grabpgsqlconnection(pl, 1, 0)
+			defer dbp.Close()
 			outputchannels <- morphologyworker(wordmap[j], uselang, j, 0, dbp)
-		}(wordmap[i], uselang, i, dbp)
+		}(wordmap[i], uselang, i, pl)
 	}
 
 	go func() {
