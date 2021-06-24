@@ -15,8 +15,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/bytedance/sonic"
+	// "github.com/bytedance/sonic"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -97,7 +98,7 @@ func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisL
 				rcdel(rc, searchkey)
 				foundrows.Close()
 			} else {
-				jsonhit, err := sonic.Marshal(thehit)
+				jsonhit, err := json.Marshal(thehit)
 				checkerror(err)
 				rcsadd(rc, resultkey, jsonhit)
 				logiflogging(fmt.Sprintf("grabber #%d added a result to %s: %s.%d", clientnumber, resultkey, thehit.WkUID, thehit.TbIndex), ll, 4)
@@ -122,7 +123,7 @@ func findtherows(thequery string, thecaller string, searchkey string, clientnumb
 
 	// [iii] decode the query
 	var prq PrerolledQuery
-	err := sonic.Unmarshal([]byte(thequery), &prq)
+	err := json.Unmarshal([]byte(thequery), &prq)
 	checkerror(err)
 
 	// [iv] build a temp table if needed

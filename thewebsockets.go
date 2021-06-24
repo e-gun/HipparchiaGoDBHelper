@@ -14,11 +14,11 @@ package main
 
 import (
 	"C"
+	"encoding/json"
 	"fmt"
-	"github.com/bytedance/sonic"
+	// "github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"github.com/gomodule/redigo/redis"
-	// "github.com/go-redis/redis"
 	"gopkg.in/olahol/melody.v1"
 	"reflect"
 	"regexp"
@@ -85,7 +85,7 @@ func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving
 		// change on HipparchiaServer's end
 		redisvals := retrievepollingdata(searchid, rediskeys, loglevel, rc)
 		cpd := typeconvertpollingdata(searchid, rediskeys, redisvals)
-		jsonreply, err := sonic.Marshal(cpd)
+		jsonreply, err := json.Marshal(cpd)
 		checkerror(err)
 		e := msg.Broadcast(jsonreply)
 		checkerror(e)

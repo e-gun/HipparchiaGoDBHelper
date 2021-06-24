@@ -80,9 +80,10 @@ package main
 
 import (
 	"C"
+	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/bytedance/sonic"
+	// "github.com/bytedance/sonic"
 	"os"
 	"time"
 )
@@ -91,7 +92,7 @@ const (
 	redisexpiration = 5 * time.Minute
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.2.1"
+	version         = "1.2.2"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -252,7 +253,7 @@ func NewPostgresLogin(ho string, po int, us string, pw string, db string) *Postg
 
 func decoderedislogin(redislogininfo []byte) RedisLogin {
 	var rl RedisLogin
-	err := sonic.Unmarshal(redislogininfo, &rl)
+	err := json.Unmarshal(redislogininfo, &rl)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("CANNOT PARSE YOUR REDIS LOGIN CREDENTIALS AS JSON [%s v.%s] ", myname, version))
 		panic(err)
@@ -262,7 +263,7 @@ func decoderedislogin(redislogininfo []byte) RedisLogin {
 
 func decodepsqllogin(psqllogininfo []byte) PostgresLogin {
 	var ps PostgresLogin
-	err := sonic.Unmarshal(psqllogininfo, &ps)
+	err := json.Unmarshal(psqllogininfo, &ps)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("CANNOT PARSE YOUR POSTGRES LOGIN CREDENTIALS AS JSON [%s v.%s] ", myname, version))
 		panic(err)
