@@ -81,9 +81,10 @@ package main
 import (
 	"C"
 	"context"
-	"encoding/json"
+	// "encoding/json"
 	"flag"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"github.com/go-redis/redis"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"os"
@@ -255,7 +256,7 @@ func NewPostgresLogin(ho string, po int, us string, pw string, db string) *Postg
 
 func decoderedislogin(redislogininfo []byte) RedisLogin {
 	var rl RedisLogin
-	err := json.Unmarshal(redislogininfo, &rl)
+	err := sonic.Unmarshal(redislogininfo, &rl)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("CANNOT PARSE YOUR REDIS LOGIN CREDENTIALS AS JSON [%s v.%s] ", myname, version))
 		panic(err)
@@ -265,7 +266,7 @@ func decoderedislogin(redislogininfo []byte) RedisLogin {
 
 func decodepsqllogin(psqllogininfo []byte) PostgresLogin {
 	var ps PostgresLogin
-	err := json.Unmarshal(psqllogininfo, &ps)
+	err := sonic.Unmarshal(psqllogininfo, &ps)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("CANNOT PARSE YOUR POSTGRES LOGIN CREDENTIALS AS JSON [%s v.%s] ", myname, version))
 		panic(err)
