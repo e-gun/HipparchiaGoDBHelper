@@ -160,62 +160,21 @@ after pre-building the possibilities inside of the database...
 
 pipelined redis is fast
 
-1314 •erik@big-sur-box• e-gun/HipparchiaGoDBHelper/ % ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" -t 5 -p ${L}
-[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.2.3) [loglevel=3]
+./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 149570 -k "" -t 6 -svbs 1 -p ${L}
+[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.3.1) [loglevel=3]
 [HGH] Bagger Module Launched
 [HGH] Seeking to build *winnertakesall* bags of words
 [HGH] Connected to redis
 [HGH] Connected to hipparchiaDB on PostgreSQL
 [HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
-[HGH] [A: 0.219s][Δ: 0.219s] 139997 lines acquired
-[HGH] [B: 0.295s][Δ: 0.076s] Unified text block built
-[HGH] [C: 0.428s][Δ: 0.132s] Preliminary cleanups complete
-[HGH] [D: 1.402s][Δ: 0.974s] Found 68790 sentences
-[HGH] [E: 1.462s][Δ: 0.060s] Found 80125 distinct words
-[HGH] [F: 1.881s][Δ: 0.419s] Got morphology for 73819 terms
-[HGH] [G: 1.909s][Δ: 0.028s] Built morphmap for 80290 terms
-[HGH] [H: 2.354s][Δ: 0.444s] Finished bagging 68790 bags
-[HGH] [I: 2.506s][Δ: 0.153s] Cleared stopwords: 67639 bags remain
-[HGH] [J: 2.644s][Δ: 0.138s] Finished loading
+[HGH] [A: 0.219s][Δ: 0.219s] 149567 lines acquired
+[HGH] [B: 0.301s][Δ: 0.082s] Unified text block built
+[HGH] [C: 0.483s][Δ: 0.182s] Preliminary cleanups complete
+[HGH] [D: 1.506s][Δ: 1.022s] Inserted 72930 sentences into 72930 bags
+[HGH] [E: 1.569s][Δ: 0.063s] Found 83301 distinct words
+[HGH] [F: 2.064s][Δ: 0.495s] Got morphology for 76492 terms
+[HGH] [G: 2.096s][Δ: 0.032s] Built morphmap for 83469 terms
+[HGH] [H: 2.467s][Δ: 0.370s] Finished bagging 72930 bags
+[HGH] [I: 2.621s][Δ: 0.155s] Cleared stopwords: 71833 bags remain
+[HGH] [J: 2.784s][Δ: 0.163s] Finished loading
 bags have been stored at _vectorresults%
-
-
-% ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" -t 6 -p ${L}
-[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.2.3) [loglevel=3]
-[HGH] Bagger Module Launched
-[HGH] Seeking to build *winnertakesall* bags of words
-[HGH] Connected to redis
-[HGH] Connected to hipparchiaDB on PostgreSQL
-[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
-[HGH] [A: 0.272s][Δ: 0.272s] 139997 lines acquired
-[HGH] [B: 0.347s][Δ: 0.075s] Unified text block built
-[HGH] [C: 0.490s][Δ: 0.143s] Preliminary cleanups complete
-[HGH] [D: 1.525s][Δ: 1.035s] Found 68790 sentences
-[HGH] [E: 1.596s][Δ: 0.071s] Found 80125 distinct words
-[HGH] [F: 1.931s][Δ: 0.335s] Got morphology for 73819 terms
-[HGH] [G: 1.965s][Δ: 0.034s] Built morphmap for 80290 terms
-[HGH] [H: 2.427s][Δ: 0.463s] Finished bagging 68790 bags
-[HGH] [I: 2.584s][Δ: 0.157s] Cleared stopwords: 67639 bags remain
-[HGH] [J: 2.649s][Δ: 0.065s] Finished loading
-bags have been stored at _vectorresults%
-
-
-./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 140000 -k "" -t 6 -svbs 2 -p ${L}
-[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.3.0) [loglevel=3]
-[HGH] Bagger Module Launched
-[HGH] Seeking to build *winnertakesall* bags of words
-[HGH] Connected to redis
-[HGH] Connected to hipparchiaDB on PostgreSQL
-[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
-[HGH] [A: 0.239s][Δ: 0.239s] 139997 lines acquired
-[HGH] [B: 0.317s][Δ: 0.078s] Unified text block built
-[HGH] [C: 0.461s][Δ: 0.144s] Preliminary cleanups complete
-[HGH] [D: 1.194s][Δ: 0.734s] Inserted 68790 sentences into 34395 bags
-[HGH] [E: 1.259s][Δ: 0.064s] Found 80125 distinct words
-[HGH] [F: 1.883s][Δ: 0.624s] Got morphology for 73819 terms
-[HGH] [G: 1.916s][Δ: 0.033s] Built morphmap for 80290 terms
-[HGH] [H: 2.301s][Δ: 0.386s] Finished bagging 34395 bags
-[HGH] [I: 2.442s][Δ: 0.141s] Cleared stopwords: 34394 bags remain
-[HGH] [J: 2.515s][Δ: 0.073s] Finished loading
-bags have been stored at _vectorresults%
-

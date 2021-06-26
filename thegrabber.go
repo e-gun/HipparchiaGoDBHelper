@@ -73,36 +73,69 @@ func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisL
 		foundrows := findtherows(thequery, "grabber", searchkey, clientnumber, ll, rc, dbpool)
 
 		// [vi] iterate through the finds
+		// don't check-and-load find-by-find because some searches are effectively uncapped
+		// if you search for "y" near "x", during the first search iteration you will see:
+		// 	[debugging] [HGH] grabber #0 reports that the hitcount is 19023 [debugging]
+		// subsequently you will see:
+		//	[debugging] [HGH] grabber #2 reports that the hitcount is 243 [debugging]
+		//	[debugging] [HGH] grabber #0 reports that the hitcount is 244 [debugging]
+		//	[debugging] [HGH] grabber #3 reports that the hitcount is 351 [debugging]
+		//	[debugging] [HGH] grabber #1 reports that the hitcount is 351 [debugging]
+		// and yet only 200 items will come back at you if 200 is your cap
+		// faster to test only after you finish each query
+		// can over-load redis because HipparchaServer should only display hitcap results no matter how many you push
+
+		var thesefinds []DbWorkline
+
 		defer foundrows.Close()
 		for foundrows.Next() {
-			// [vi.1] convert the find to a DbWorkline
+			// [vi.1] convert the finds into DbWorklines
 			var thehit DbWorkline
 			err := foundrows.Scan(&thehit.WkUID, &thehit.TbIndex, &thehit.Lvl5Value, &thehit.Lvl4Value, &thehit.Lvl3Value,
 				&thehit.Lvl2Value, &thehit.Lvl1Value, &thehit.Lvl0Value, &thehit.MarkedUp, &thehit.Accented,
 				&thehit.Stripped, &thehit.Hypenated, &thehit.Annotations)
 			checkerror(err)
-
-			// [vi.2] if you have not hit the cap on finds, store the result in 'querykey_results'
-			// also update the polling hitcount key
-			hitcount, e := redis.Int64(rc.Do("SCARD", resultkey))
-			checkerror(e)
-
-			k := searchkey + "_hitcount"
-			_, ee := rc.Do("SET", k, hitcount)
-			checkerror(ee)
-			logiflogging(fmt.Sprintf("grabber #%d reports that the hitcount is %d", clientnumber, hitcount), ll, 3)
-
-			if hitcount >= hitcap {
-				// trigger the break in the outer loop
-				rcdel(rc, searchkey)
-				foundrows.Close()
-			} else {
-				jsonhit, err := json.Marshal(thehit)
-				checkerror(err)
-				rcsadd(rc, resultkey, jsonhit)
-				logiflogging(fmt.Sprintf("grabber #%d added a result to %s: %s.%d", clientnumber, resultkey, thehit.WkUID, thehit.TbIndex), ll, 4)
-			}
+			thesefinds = append(thesefinds, thehit)
 		}
+
+		// [vi.2] load via pipeline
+		err := rc.Send("MULTI")
+		checkerror(err)
+
+		for i := 0; i < len(thesefinds); i++ {
+			jsonhit, ee := json.Marshal(thesefinds[i])
+			checkerror(ee)
+
+			e := rc.Send("SADD", resultkey, jsonhit)
+			checkerror(e)
+		}
+
+		_, e := rc.Do("EXEC")
+		checkerror(e)
+
+		// [vi.3] busted the cap?
+		done := checkcap(searchkey, hitcap, clientnumber, ll, rc)
+		if done {
+			// trigger the break in the outer loop
+			rcdel(rc, searchkey)
+		}
+	}
+}
+
+func checkcap(searchkey string, cap int64, client int, ll int, rc redis.Conn) bool {
+	resultkey := searchkey + "_results"
+	hitcount, e := redis.Int64(rc.Do("SCARD", resultkey))
+	checkerror(e)
+
+	k := searchkey + "_hitcount"
+	_, ee := rc.Do("SET", k, hitcount)
+	checkerror(ee)
+	logiflogging(fmt.Sprintf("grabber #%d reports that the hitcount is %d", client, hitcount), ll, 3)
+	if hitcount >= cap {
+		// trigger the break in the outer loop
+		return true
+	} else {
+		return false
 	}
 }
 

@@ -63,11 +63,6 @@ func rcdel(c redis.Conn, k string) {
 	checkerror(err)
 }
 
-func rcsadd(c redis.Conn, k string, v []byte) {
-	_, err := c.Do("SADD", k, v)
-	checkerror(err)
-}
-
 func rcsetint(c redis.Conn, k string, v int64) {
 	_, err := c.Do("SET", k, v)
 	checkerror(err)

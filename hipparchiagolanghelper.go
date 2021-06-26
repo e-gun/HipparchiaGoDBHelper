@@ -92,7 +92,7 @@ import (
 const (
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.3.1"
+	version         = "1.3.2"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
