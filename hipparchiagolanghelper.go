@@ -40,40 +40,42 @@
 
 // Usage of ./HipparchiaGoDBHelper:
 //  -c int
-//        [searches] max hit count (default 200)
+//    	[searches] max hit count (default 200)
 //  -k string
-//        [searches] redis key to use
+//    	[searches] redis key to use
 //  -l int
-//        [common] logging level: 0 is silent; 5 is very noisy (default 1)
+//    	[common] logging level: 0 is silent; 5 is very noisy (default 1)
 //  -p string
-//        [common] psql logon information (as a JSON string) (default "{\"Host\": \"localhost\", \"Port\": 5432, \"User\": \"hippa_wr\", \"Pass\": \"\", \"DBName\": \"hipparchiaDB\"}")
+//    	[common] psql logon information (as a JSON string) (default "{\"Host\": \"localhost\", \"Port\": 5432, \"User\": \"hippa_wr\", \"Pass\": \"\", \"DBName\": \"hipparchiaDB\"}")
 //  -r string
-//        [common] redis logon information (as a JSON string) (default "{\"Addr\": \"localhost:6379\", \"Password\": \"\", \"DB\": 0}")
+//    	[common] redis logon information (as a JSON string) (default "{\"Addr\": \"localhost:6379\", \"Password\": \"\", \"DB\": 0}")
 //  -sv
-//        [vectors] assert that this is a vectorizing run
+//    	[vectors] assert that this is a vectorizing run
 //  -svb string
-//        [vectors] the bagging method: choices are alternates, flat, unlemmatized, winnertakesall (default "winnertakesall")
+//    	[vectors] the bagging method: choices are alternates, flat, unlemmatized, winnertakesall (default "winnertakesall")
+//  -svbs int
+//    	[vectors] number of sentences per bag (default 1)
 //  -svdb string
-//        [vectors][for manual debugging] db to grab from (default "lt0448")
+//    	[vectors][for manual debugging] db to grab from (default "lt0448")
 //  -sve int
-//        [vectors][for manual debugging] last line to grab (default 26)
+//    	[vectors][for manual debugging] last line to grab (default 26)
 //  -svhw string
-//        [vectors] provide a string of headwords to skip 'one two three...' (default "(suppressed owing to length)")
+//    	[vectors] provide a string of headwords to skip 'one two three...' (default "(suppressed owing to length)")
 //  -svin string
-//        [vectors][provide a string of inflected forms to skip 'one two three...' (default "(suppressed owing to length)")
+//    	[vectors][provide a string of inflected forms to skip 'one two three...' (default "(suppressed owing to length)")
 //  -svs int
-//        [vectors][for manual debugging] first line to grab (default 1)
+//    	[vectors][for manual debugging] first line to grab (default 1)
 //  -t int
-//        [common] number of goroutines to dispatch (default 5)
-//  -v    [common] print version and exit
+//    	[common] number of goroutines to dispatch (default 5)
+//  -v	[common] print version and exit
 //  -ws
-//        [websockets] assert that you are requesting the websocket server
+//    	[websockets] assert that you are requesting the websocket server
 //  -wsf int
-//        [websockets] fail threshold before messages stop being sent (default 3)
+//    	[websockets] fail threshold before messages stop being sent (default 3)
 //  -wsp int
-//        [websockets] port on which to open the websocket server (default 5010)
+//    	[websockets] port on which to open the websocket server (default 5010)
 //  -wss int
-//        [websockets] save the polls instead of deleting them: 0 is no; 1 is yes
+//    	[websockets] save the polls instead of deleting them: 0 is no; 1 is yes
 
 // toggle the package name to shift between cli and module builds: main or hipparchiagolangsearching
 package main
@@ -90,7 +92,7 @@ import (
 const (
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.2.3"
+	version         = "1.3.0"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -136,11 +138,13 @@ func main() {
 	var dbdb string
 	var dbdbs int
 	var dbdbe int
+	var bs int
 	var b string
 	var hw string
 	var in string
 
 	flag.StringVar(&b, "svb", "winnertakesall", "[vectors] the bagging method: choices are alternates, flat, unlemmatized, winnertakesall")
+	flag.IntVar(&bs, "svbs", 1, "[vectors] number of sentences per bag")
 	flag.StringVar(&dbdb, "svdb", testdb, "[vectors][for manual debugging] db to grab from")
 	flag.IntVar(&dbdbs, "svs", teststart, "[vectors][for manual debugging] first line to grab")
 	flag.IntVar(&dbdbe, "sve", testend, "[vectors][for manual debugging] last line to grab")
@@ -196,7 +200,7 @@ func main() {
 
 	if *sv {
 		// vectors
-		o = HipparchiaBagger(k, b, g, dbdb, dbdbs, dbdbe, l, hw, in, rl, po)
+		o = HipparchiaBagger(k, b, g, bs, dbdb, dbdbs, dbdbe, l, hw, in, rl, po)
 		x = "bags"
 		t = -1
 	} else if *ws {

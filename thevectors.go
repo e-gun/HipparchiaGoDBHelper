@@ -33,7 +33,7 @@ import (
 )
 
 //HipparchiaBagger: Take a key; grab lines; bag them; store them
-func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb string, thestart int, theend int,
+func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize int, thedb string, thestart int, theend int,
 	loglevel int, headwordstoskip string, inflectedtoskip string, rl RedisLogin, pl PostgresLogin) string {
 	// this does not work at the moment if called as a python module
 	// but HipparchiaServer does not know how to call it either...
@@ -147,8 +147,28 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 	const notachar = `[^\sa-zα-ωϲϹἀἁἂἃἄἅἆἇᾀᾁᾂᾃᾄᾅᾆᾇᾲᾳᾴᾶᾷᾰᾱὰάἐἑἒἓἔἕὲέἰἱἲἳἴἵἶἷὶίῐῑῒΐῖῗὀὁὂὃὄὅόὸὐὑὒὓὔὕὖὗϋῠῡῢΰῦῧύὺᾐᾑᾒᾓᾔᾕᾖᾗῂῃῄῆῇἤἢἥἣὴήἠἡἦἧὠὡὢὣὤὥὦὧᾠᾡᾢᾣᾤᾥᾦᾧῲῳῴῶῷώὼ]`
 	re := regexp.MustCompile(tagger)
 
-	for i := 0; i < len(ss); i++ {
-		tags := re.FindAllStringSubmatch(ss[i], -1)
+	//for i := 0; i < len(ss); i++ {
+	//	tags := re.FindAllStringSubmatch(ss[i], -1)
+	//	if len(tags) > 0 {
+	//		first = tags[0][1]
+	//		last = tags[len(tags)-1][1]
+	//	} else {
+	//		first = last
+	//	}
+	//	var sl SentenceWithLocus
+	//	sl.Loc = first
+	//	sl.Sent = strings.ToLower(ss[i])
+	//	sl.Sent = stripper(sl.Sent, []string{tagger, notachar})
+	//	sentences = append(sentences, sl)
+	//}
+
+	totalsent := len(ss)
+	iterations := len(ss) / bagsize
+	index := 0
+	for i := 0; i < iterations; i++ {
+		parcel := strings.Join(ss[index:index+bagsize], " ")
+		index = index + bagsize
+		tags := re.FindAllStringSubmatch(parcel, -1)
 		if len(tags) > 0 {
 			first = tags[0][1]
 			last = tags[len(tags)-1][1]
@@ -157,12 +177,16 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, thedb st
 		}
 		var sl SentenceWithLocus
 		sl.Loc = first
-		sl.Sent = strings.ToLower(ss[i])
+		sl.Sent = strings.ToLower(parcel)
 		sl.Sent = stripper(sl.Sent, []string{tagger, notachar})
 		sentences = append(sentences, sl)
 	}
 
-	m = fmt.Sprintf("Found %d sentences", len(sentences))
+	//for i := 0; i < len(sentences); i++ {
+	//	fmt.Println(fmt.Sprintf("[%d] %s: %s", i, sentences[i].Loc, sentences[i].Sent))
+	//}
+
+	m = fmt.Sprintf("Inserted %d sentences into %d bags", totalsent, len(sentences))
 	rcsetstr(rc, smk, m)
 	timetracker("D", m, start, previous, loglevel)
 	previous = time.Now()

@@ -187,17 +187,6 @@ func typeconvertpollingdata(searchid string, rediskeys [8]string, redisvals [8]s
 	return cpd
 }
 
-//func deletewhendone(searchid string, rediskeys [8]string, loglevel int, rc *redis.Client) {
-//	// make sure that the "there is no work" message gets propagated
-//	rc.Set(searchid+"_poolofwork", -1, redisexpiration)
-//	time.Sleep(pollinginterval)
-//	// get rid of the polling keys
-//	for i := 0; i < len(rediskeys); i++ {
-//		_, _ = rc.Del(fmt.Sprintf("%s_%s", searchid, rediskeys[i])).Result()
-//	}
-//	logiflogging(fmt.Sprintf("deleted redis keys for %s", searchid), loglevel, 2)
-//}
-
 func deletewhendone(searchid string, rediskeys [8]string, loglevel int, rc redis.Conn) {
 	// make sure that the "there is no work" message gets propagated
 	p := fmt.Sprintf("%s_poolofwork", searchid)
