@@ -56,7 +56,7 @@ func splitonpunctuaton(text string) []string {
 	return split
 }
 
-func dropstopwords(skipper string, bagsofwords []SentenceWithLocus) []SentenceWithLocus {
+func dropstopwords(skipper string, bagsofwords []BagWithLocus) []BagWithLocus {
 	// set up the skiplist; then iterate through the bags returning new, clean bags
 	s := strings.Split(skipper, " ")
 	sm := make(map[string]bool)
@@ -65,9 +65,9 @@ func dropstopwords(skipper string, bagsofwords []SentenceWithLocus) []SentenceWi
 	}
 
 	for i := 0; i < len(bagsofwords); i++ {
-		wl := strings.Split(bagsofwords[i].Sent, " ")
+		wl := strings.Split(bagsofwords[i].Bag, " ")
 		wl = stopworddropper(sm, wl)
-		bagsofwords[i].Sent = strings.Join(wl, " ")
+		bagsofwords[i].Bag = strings.Join(wl, " ")
 	}
 
 	return bagsofwords
@@ -90,41 +90,41 @@ func stopworddropper(stops map[string]bool, wordlist []string) []string {
 // BAGGING
 //
 
-func buildflatbagsofwords(bags []SentenceWithLocus, parsemap map[string][]string) []SentenceWithLocus {
+func buildflatbagsofwords(bags []BagWithLocus, parsemap map[string][]string) []BagWithLocus {
 	// turn a list of sentences into a list of list of headwords; here we put alternate possibilities next to one another:
 	// flatbags: ϲυγγενεύϲ ϲυγγενήϲ
 	// composite: ϲυγγενεύϲ·ϲυγγενήϲ
 
 	for i := 0; i < len(bags); i++ {
 		var newwords []string
-		words := strings.Split(bags[i].Sent, " ")
+		words := strings.Split(bags[i].Bag, " ")
 		for j := 0; j < len(words); j++ {
 			newwords = append(newwords, parsemap[words[j]]...)
 		}
-		bags[i].Sent = strings.Join(newwords, " ")
+		bags[i].Bag = strings.Join(newwords, " ")
 	}
 
 	return bags
 }
 
-func buildcompositebagsofwords(bags []SentenceWithLocus, parsemap map[string][]string) []SentenceWithLocus {
+func buildcompositebagsofwords(bags []BagWithLocus, parsemap map[string][]string) []BagWithLocus {
 	// turn a list of sentences into a list of list of headwords; here we put yoked alternate possibilities next to one another:
 	// flatbags: ϲυγγενεύϲ ϲυγγενήϲ
 	// composite: ϲυγγενεύϲ·ϲυγγενήϲ
 
 	for i := 0; i < len(bags); i++ {
 		var newwords []string
-		words := strings.Split(bags[i].Sent, " ")
+		words := strings.Split(bags[i].Bag, " ")
 		for j := 0; j < len(words); j++ {
 			comp := strings.Join(parsemap[words[j]], "·")
 			newwords = append(newwords, comp)
 		}
-		bags[i].Sent = strings.Join(newwords, " ")
+		bags[i].Bag = strings.Join(newwords, " ")
 	}
 	return bags
 }
 
-func buildwinnertakesallbagsofwords(bags []SentenceWithLocus, parsemap map[string][]string, dbpool *pgxpool.Pool) []SentenceWithLocus {
+func buildwinnertakesallbagsofwords(bags []BagWithLocus, parsemap map[string][]string, dbpool *pgxpool.Pool) []BagWithLocus {
 	// turn a list of sentences into a list of list of headwords; here we figure out which headword is the dominant homonym
 	// then we just use that term; "esse" always comes from "sum" and never "edo", etc.
 

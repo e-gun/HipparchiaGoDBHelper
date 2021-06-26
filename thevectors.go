@@ -8,7 +8,7 @@
 // [a] grab db lines that are relevant to the search
 // [b] turn them into a unified text block
 // [c] do some preliminary cleanups
-// [d] break the text into sentences and assemble []SentenceWithLocus (NB: these are "unlemmatized bags of words")
+// [d] break the text into sentences and assemble []BagWithLocus (NB: these are "unlemmatized bags of words")
 // [e] figure out all of the words used in the passage
 // [f] find all of the parsing info relative to these words
 // [g] figure out which headwords to associate with the collection of words
@@ -136,31 +136,27 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	timetracker("C", m, start, previous, loglevel)
 	previous = time.Now()
 
-	// [d] break the text into sentences and assemble []SentenceWithLocus
+	// [d] break the text into sentences and assemble []BagWithLocus
 
-	ss := splitonpunctuaton(thetext)
-	var sentences []SentenceWithLocus
+	split := splitonpunctuaton(thetext)
+
+	// empty sentences via "..."? not much of an issue: Cicero goes from 68790 to 68697
+	// this will cost you c. .03s
+
+	var ss []string
+	for i := 0; i < len(split); i++ {
+		if len(split[i]) > 0 {
+			ss = append(ss, split[i])
+		}
+	}
+
+	var thebags []BagWithLocus
 	var first string
 	var last string
 
 	const tagger = `⊏(.*?)⊐`
 	const notachar = `[^\sa-zα-ωϲϹἀἁἂἃἄἅἆἇᾀᾁᾂᾃᾄᾅᾆᾇᾲᾳᾴᾶᾷᾰᾱὰάἐἑἒἓἔἕὲέἰἱἲἳἴἵἶἷὶίῐῑῒΐῖῗὀὁὂὃὄὅόὸὐὑὒὓὔὕὖὗϋῠῡῢΰῦῧύὺᾐᾑᾒᾓᾔᾕᾖᾗῂῃῄῆῇἤἢἥἣὴήἠἡἦἧὠὡὢὣὤὥὦὧᾠᾡᾢᾣᾤᾥᾦᾧῲῳῴῶῷώὼ]`
 	re := regexp.MustCompile(tagger)
-
-	//for i := 0; i < len(ss); i++ {
-	//	tags := re.FindAllStringSubmatch(ss[i], -1)
-	//	if len(tags) > 0 {
-	//		first = tags[0][1]
-	//		last = tags[len(tags)-1][1]
-	//	} else {
-	//		first = last
-	//	}
-	//	var sl SentenceWithLocus
-	//	sl.Loc = first
-	//	sl.Sent = strings.ToLower(ss[i])
-	//	sl.Sent = stripper(sl.Sent, []string{tagger, notachar})
-	//	sentences = append(sentences, sl)
-	//}
 
 	totalsent := len(ss)
 	iterations := len(ss) / bagsize
@@ -175,31 +171,31 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 		} else {
 			first = last
 		}
-		var sl SentenceWithLocus
+		var sl BagWithLocus
 		sl.Loc = first
-		sl.Sent = strings.ToLower(parcel)
-		sl.Sent = stripper(sl.Sent, []string{tagger, notachar})
-		sentences = append(sentences, sl)
+		sl.Bag = strings.ToLower(parcel)
+		sl.Bag = stripper(sl.Bag, []string{tagger, notachar})
+		thebags = append(thebags, sl)
 	}
 
 	//for i := 0; i < len(sentences); i++ {
-	//	fmt.Println(fmt.Sprintf("[%d] %s: %s", i, sentences[i].Loc, sentences[i].Sent))
+	//	fmt.Println(fmt.Sprintf("[%d] %s: %s", i, sentences[i].Loc, sentences[i].Bag))
 	//}
 
-	m = fmt.Sprintf("Inserted %d sentences into %d bags", totalsent, len(sentences))
+	m = fmt.Sprintf("Inserted %d sentences into %d bags", totalsent, len(thebags))
 	rcsetstr(rc, smk, m)
 	timetracker("D", m, start, previous, loglevel)
 	previous = time.Now()
 
 	// unlemmatized bags of words customers have in fact reached their target as of now
 	if baggingmethod == "unlemmatized" {
-		sentences = dropstopwords(inflectedtoskip, sentences)
+		thebags = dropstopwords(inflectedtoskip, thebags)
 		kk := strings.Split(key, "_")
 		resultkey := kk[0] + "_vectorresults"
-		loadthebags(resultkey, goroutines, sentences, rl)
-		// DO NO comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer
+		loadthebags(resultkey, goroutines, thebags, rl)
+		// DO NOT comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer
 		// "resultrediskey = resultrediskey.split()[-1]"
-		fmt.Println(fmt.Sprintf("%d %s bags of words stored at %s", len(sentences), baggingmethod, resultkey))
+		fmt.Println(fmt.Sprintf("%d %s bags of words stored at %s", len(thebags), baggingmethod, resultkey))
 		os.Exit(0)
 	}
 
@@ -208,9 +204,9 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	// [e] figure out all of the words used in the passage
 
 	// generate a "set" via make(map[string]bool)
-	allwords := make(map[string]bool, len(sentences))
-	for i := 0; i < len(sentences); i++ {
-		ww := strings.Split(sentences[i].Sent, " ")
+	allwords := make(map[string]bool, len(thebags))
+	for i := 0; i < len(thebags); i++ {
+		ww := strings.Split(thebags[i].Bag, " ")
 		for j := 0; j < len(ww); j++ {
 			allwords[ww[j]] = true
 		}
@@ -271,35 +267,35 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	switch baggingmethod {
 	// see vectorparsingandbagging.go
 	case "flat":
-		sentences = buildflatbagsofwords(sentences, morphdict)
+		thebags = buildflatbagsofwords(thebags, morphdict)
 	case "alternates":
-		sentences = buildcompositebagsofwords(sentences, morphdict)
+		thebags = buildcompositebagsofwords(thebags, morphdict)
 	case "winnertakesall":
-		sentences = buildwinnertakesallbagsofwords(sentences, morphdict, dbpool)
+		thebags = buildwinnertakesallbagsofwords(thebags, morphdict, dbpool)
 	default:
 		m = fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", baggingmethod)
 		logiflogging(m, loglevel, 0)
 	}
 
-	m = fmt.Sprintf("Finished bagging %d bags", len(sentences))
+	m = fmt.Sprintf("Finished bagging %d bags", len(thebags))
 	rcsetstr(rc, smk, m)
 	timetracker("H", m, start, previous, loglevel)
 	previous = time.Now()
 
 	// [i] purge stopwords
-	sentences = dropstopwords(headwordstoskip, sentences)
-	sentences = dropstopwords(inflectedtoskip, sentences)
+	thebags = dropstopwords(headwordstoskip, thebags)
+	thebags = dropstopwords(inflectedtoskip, thebags)
 
-	var clearedlist []SentenceWithLocus
-	for i := 0; i < len(sentences); i++ {
-		if sentences[i].Sent != "" {
-			clearedlist = append(clearedlist, sentences[i])
+	var clearedlist []BagWithLocus
+	for i := 0; i < len(thebags); i++ {
+		if thebags[i].Bag != "" {
+			clearedlist = append(clearedlist, thebags[i])
 		}
 	}
 
-	sentences = clearedlist
+	thebags = clearedlist
 
-	m = fmt.Sprintf("Cleared stopwords: %d bags remain", len(sentences))
+	m = fmt.Sprintf("Cleared stopwords: %d bags remain", len(thebags))
 	rcsetstr(rc, smk, m)
 	timetracker("I", m, start, previous, loglevel)
 	previous = time.Now()
@@ -308,7 +304,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	kk := strings.Split(key, "_")
 	resultkey := kk[0] + "_vectorresults"
 
-	loadthebags(resultkey, goroutines, sentences, rl)
+	loadthebags(resultkey, goroutines, thebags, rl)
 
 	m = fmt.Sprintf("Finished loading")
 	rcsetstr(rc, smk, m)
@@ -321,11 +317,11 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	return resultkey
 }
 
-func loadthebags(resultkey string, goroutines int, sentences []SentenceWithLocus, rl RedisLogin) {
+func loadthebags(resultkey string, goroutines int, sentences []BagWithLocus, rl RedisLogin) {
 	totalwork := len(sentences)
 	chunksize := totalwork / goroutines
 	leftover := totalwork % goroutines
-	bagsofbags := make(map[int][]SentenceWithLocus, goroutines)
+	bagsofbags := make(map[int][]BagWithLocus, goroutines)
 
 	if totalwork <= goroutines {
 		bagsofbags[0] = sentences
@@ -350,7 +346,7 @@ func loadthebags(resultkey string, goroutines int, sentences []SentenceWithLocus
 	wg.Wait()
 }
 
-func parallelredisloader(workerid int, resultkey string, bags []SentenceWithLocus, rl RedisLogin, wg *sync.WaitGroup) {
+func parallelredisloader(workerid int, resultkey string, bags []BagWithLocus, rl RedisLogin, wg *sync.WaitGroup) {
 	// make sure that "0" comes in last so you can watch the parallelism
 	//if workerid == 0 {
 	//	time.Sleep(pollinginterval)

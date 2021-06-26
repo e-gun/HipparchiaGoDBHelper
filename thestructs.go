@@ -61,9 +61,9 @@ func (w WHWList) Swap(i, j int) {
 	w[i], w[j] = w[j], w[i]
 }
 
-type SentenceWithLocus struct {
-	Loc  string
-	Sent string
+type BagWithLocus struct {
+	Loc string
+	Bag string
 }
 
 type DbMorphology struct {

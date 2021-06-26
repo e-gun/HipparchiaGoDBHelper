@@ -19,7 +19,7 @@
 // [a] grab db lines that are relevant to the search
 // [b] turn them into a unified text block
 // [c] do some preliminary cleanups
-// [d] break the text into sentences and assemble []SentenceWithLocus (NB: these are "unlemmatized bags of words")
+// [d] break the text into sentences and assemble []BagWithLocus (NB: these are "unlemmatized bags of words")
 // [e] figure out all of the words used in the passage
 // [f] find all of the parsing info relative to these words
 // [g] figure out which headwords to associate with the collection of words
@@ -92,7 +92,7 @@ import (
 const (
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.3.0"
+	version         = "1.3.1"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
