@@ -47,6 +47,8 @@
 //    	[common] logging level: 0 is silent; 5 is very noisy (default 1)
 //  -p string
 //    	[common] psql logon information (as a JSON string) (default "{\"Host\": \"localhost\", \"Port\": 5432, \"User\": \"hippa_wr\", \"Pass\": \"\", \"DBName\": \"hipparchiaDB\"}")
+//  -profile
+//    	[debugging] profile cpu use to './profiler_output.bin'
 //  -r string
 //    	[common] redis logon information (as a JSON string) (default "{\"Addr\": \"localhost:6379\", \"Password\": \"\", \"DB\": 0}")
 //  -sv
@@ -86,13 +88,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/pprof"
 	"time"
 )
 
 const (
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.3.2"
+	version         = "1.3.3"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -108,6 +111,7 @@ const (
 //
 
 func main() {
+
 	versioninfo := fmt.Sprintf("%s CLI Debugging Interface (v.%s)", myname, version)
 
 	// WARNING: a password is going to be hard-coded into the binary. It is easy to use the binary in HipparchiaServer
@@ -172,7 +176,22 @@ func main() {
 	flag.IntVar(&wss, "wss", 0, "[websockets] save the polls instead of deleting them: 0 is no; 1 is yes")
 
 	v := flag.Bool("v", false, "[common] print version and exit")
+	profile := flag.Bool("profile", false, "[debugging] profile cpu use to './profiler_output.bin'")
+
 	flag.Parse()
+
+	if *profile {
+		o := "profiler_output.bin"
+		f, err := os.Create(o)
+		if err != nil {
+			logiflogging(fmt.Sprintf("failed to create '%s'", o), 0, 0)
+			checkerror(err)
+		} else {
+			logiflogging(fmt.Sprintf("logging profiling data to '%s'", o), 0, 0)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 
 	if *v {
 		fmt.Println(versioninfo)
