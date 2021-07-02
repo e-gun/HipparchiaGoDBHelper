@@ -95,7 +95,7 @@ import (
 const (
 	myname          = "Hipparchia Golang Helper"
 	shortname       = "HGH"
-	version         = "1.3.3"
+	version         = "1.3.4"
 	tesquery        = "SELECT * FROM %s WHERE index BETWEEN %d and %d"
 	testdb          = "lt0448"
 	teststart       = 1
@@ -176,18 +176,19 @@ func main() {
 	flag.IntVar(&wss, "wss", 0, "[websockets] save the polls instead of deleting them: 0 is no; 1 is yes")
 
 	v := flag.Bool("v", false, "[common] print version and exit")
-	profile := flag.Bool("profile", false, "[debugging] profile cpu use to './profiler_output.bin'")
+	cprofile := flag.Bool("cprofile", false, "[debugging] profile cpu use to './cpu_profiler_output.bin'")
+	mprofile := flag.Bool("mprofile", false, "[debugging] profile cpu use to './cpu_profiler_output.bin'")
 
 	flag.Parse()
 
-	if *profile {
-		o := "profiler_output.bin"
+	if *cprofile {
+		o := "cpu_profiler_output.bin"
 		f, err := os.Create(o)
 		if err != nil {
 			logiflogging(fmt.Sprintf("failed to create '%s'", o), 0, 0)
 			checkerror(err)
 		} else {
-			logiflogging(fmt.Sprintf("logging profiling data to '%s'", o), 0, 0)
+			logiflogging(fmt.Sprintf("logging cpu profiling data to '%s'", o), 0, 0)
 		}
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
@@ -232,6 +233,18 @@ func main() {
 		x = "hits"
 	}
 
+	if *mprofile {
+		o := "mem_profiler_output.bin"
+		f, err := os.Create(o)
+		if err != nil {
+			logiflogging(fmt.Sprintf("failed to create '%s'", o), 0, 0)
+			checkerror(err)
+		} else {
+			logiflogging(fmt.Sprintf("logging memory profiling data to '%s'", o), 0, 0)
+		}
+		pprof.WriteHeapProfile(f)
+	}
+
 	// DO NOT comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer when EXTERNALLOADING = 'cli'
 	// sharedlibraryclisearcher(): "resultrediskey = resultrediskey.split()[-1]"
 
@@ -240,6 +253,7 @@ func main() {
 	} else {
 		fmt.Printf("%s have been stored at %s", x, o)
 	}
+
 }
 
 //

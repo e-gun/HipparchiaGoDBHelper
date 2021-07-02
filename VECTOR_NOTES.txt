@@ -166,28 +166,29 @@ after pre-building the possibilities inside of the database...
 pipelined redis is fast
 
 
-./HipparchiaGoDBHelper -profile -sv -l 3 -svdb lt0474 -svs 4 -sve 149570 -k "" -t 6 -svbs 1 -p ${L}
-[HGH] logging profiling data to 'profiler_output.bin'
-[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.3.3) [loglevel=3]
+% ./HipparchiaGoDBHelper -mprofile -cprofile -sv -l 3 -svdb lt0474 -svs 4 -sve 149570 -k "" -t 6 -svbs 1 -p ${L}
+[HGH] logging cpu profiling data to 'cpu_profiler_output.bin'
+[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.3.4) [loglevel=3]
 [HGH] Bagger Module Launched
 [HGH] Seeking to build *winnertakesall* bags of words
 [HGH] Connected to redis
 [HGH] Connected to hipparchiaDB on PostgreSQL
 [HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
-[HGH] [A: 0.232s][Δ: 0.232s] 149567 lines acquired
-[HGH] [B: 0.323s][Δ: 0.091s] Unified text block built
-[HGH] [C: 0.487s][Δ: 0.164s] Preliminary cleanups complete
-[HGH] [D: 1.507s][Δ: 1.020s] Inserted 72930 sentences into 72930 bags
-[HGH] [E: 1.571s][Δ: 0.064s] Found 83301 distinct words
-[HGH] [F: 2.035s][Δ: 0.464s] Got morphology for 76492 terms
-[HGH] [G: 2.065s][Δ: 0.029s] Built morphmap for 83469 terms
-[HGH] [H: 2.440s][Δ: 0.375s] Finished bagging 72930 bags
-[HGH] [I: 2.599s][Δ: 0.159s] Cleared stopwords: 71833 bags remain
-[HGH] [J: 2.754s][Δ: 0.155s] Finished loading
+[HGH] [A: 0.244s][Δ: 0.244s] 149567 lines acquired
+[HGH] [B: 0.322s][Δ: 0.079s] Unified text block built
+[HGH] [C: 0.472s][Δ: 0.149s] Preliminary cleanups complete
+[HGH] [D: 1.542s][Δ: 1.070s] Inserted 72930 sentences into 72930 bags
+[HGH] [E: 1.608s][Δ: 0.066s] Found 83301 distinct words
+[HGH] [F: 2.119s][Δ: 0.511s] Got morphology for 76492 terms
+[HGH] [G: 2.150s][Δ: 0.030s] Built morphmap for 83469 terms
+[HGH] [H: 2.536s][Δ: 0.387s] Finished bagging 72930 bags
+[HGH] [I: 2.694s][Δ: 0.157s] Cleared stopwords: 71833 bags remain
+[HGH] [J: 2.843s][Δ: 0.149s] Finished loading
+[HGH] logging memory profiling data to 'mem_profiler_output.bin'
 bags have been stored at _vectorresults%
 
 
-1069 •erik@big-sur-box• e-gun/HipparchiaGoDBHelper/ % go tool pprof ./HipparchiaGoDBHelper ./profiler_output.bin
+1069 •erik@big-sur-box• e-gun/HipparchiaGoDBHelper/ % go tool pprof ./HipparchiaGoDBHelper ./cpu_profiler_output.bin
 File: HipparchiaGoDBHelper
 Type: cpu
 Time: Jul 2, 2021 at 12:27pm (EDT)
@@ -254,3 +255,42 @@ Showing top 25 nodes out of 212
          0     0% 23.22%      0.22s  8.24%  runtime.mcall
          0     0% 23.22%      0.22s  8.24%  runtime.schedule
 (pprof) web
+
+
+1082 •erik@big-sur-box• e-gun/HipparchiaGoDBHelper/ % go tool pprof HipparchiaGoDBHelper ./mem_profiler_output.bin
+
+(pprof) top10
+Showing nodes accounting for 19321.91kB, 100% of 19321.91kB total
+Showing top 10 nodes out of 11
+      flat  flat%   sum%        cum   cum%
+   11856kB 61.36% 61.36%    11856kB 61.36%  strings.(*genericReplacer).Replace
+ 4608.59kB 23.85% 85.21%  4608.59kB 23.85%  strings.(*Builder).grow (inline)
+ 2345.25kB 12.14% 97.35% 19321.91kB   100%  main.HipparchiaBagger
+  512.06kB  2.65%   100%   512.06kB  2.65%  main.stopworddropper (inline)
+         0     0%   100%  5120.66kB 26.50%  main.dropstopwords
+         0     0%   100% 19321.91kB   100%  main.main
+         0     0%   100%    11856kB 61.36%  main.splitonpunctuaton
+         0     0%   100% 19321.91kB   100%  runtime.main
+         0     0%   100%  4608.59kB 23.85%  strings.(*Builder).Grow (inline)
+         0     0%   100%    11856kB 61.36%  strings.(*Replacer).Replace
+
+(pprof) top10 -cum
+Showing nodes accounting for 18.37MB, 97.35% of 18.87MB total
+Showing top 10 nodes out of 11
+      flat  flat%   sum%        cum   cum%
+    2.29MB 12.14% 12.14%    18.87MB   100%  main.HipparchiaBagger
+         0     0% 12.14%    18.87MB   100%  main.main
+         0     0% 12.14%    18.87MB   100%  runtime.main
+         0     0% 12.14%    11.58MB 61.36%  main.splitonpunctuaton
+         0     0% 12.14%    11.58MB 61.36%  strings.(*Replacer).Replace
+   11.58MB 61.36% 73.50%    11.58MB 61.36%  strings.(*genericReplacer).Replace
+         0     0% 73.50%        5MB 26.50%  main.dropstopwords
+         0     0% 73.50%     4.50MB 23.85%  strings.(*Builder).Grow (inline)
+    4.50MB 23.85% 97.35%     4.50MB 23.85%  strings.(*Builder).grow (inline)
+         0     0% 97.35%     4.50MB 23.85%  strings.Join
+
+
+// fyi:
+//  https://segment.com/blog/allocation-efficiency-in-high-performance-go-services/
+//  https://blog.golang.org/pprof
+//  https://software.intel.com/content/www/us/en/develop/blogs/debugging-performance-issues-in-go-programs.html
