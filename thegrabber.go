@@ -25,19 +25,21 @@ import (
 )
 
 //HipparchiaGolangSearcher: Execute a series of SQL queries stored in redis by dispatching a collection of goroutines
-func HipparchiaGolangSearcher(thekey string, hitcap int64, workercount int, loglevel int, rl RedisLogin, pl PostgresLogin) string {
+func HipparchiaGolangSearcher(thekey string, hitcap int64, workercount int, ll int, rl RedisLogin, pl PostgresLogin) string {
 	// this is the code that the python module version is calling instead of main()
-	logiflogging(fmt.Sprintf("Searcher Module Launched"), loglevel, 1)
+	// that also means that the module needs to be able to set the logging level
+	logginglevel = ll
+	msg(fmt.Sprintf("Searcher Launched"), 1)
 
 	runtime.GOMAXPROCS(workercount + 1)
 
-	recordinitialsizeofworkpile(thekey, loglevel, rl)
+	recordinitialsizeofworkpile(thekey, rl)
 
 	var awaiting sync.WaitGroup
 
 	for i := 0; i < workercount; i++ {
 		awaiting.Add(1)
-		go grabber(i, hitcap, thekey, loglevel, rl, pl, &awaiting)
+		go grabber(i, hitcap, thekey, rl, pl, &awaiting)
 	}
 
 	awaiting.Wait()
@@ -46,10 +48,10 @@ func HipparchiaGolangSearcher(thekey string, hitcap int64, workercount int, logl
 	return resultkey
 }
 
-func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisLogin, pl PostgresLogin, awaiting *sync.WaitGroup) {
+func grabber(clientnumber int, hitcap int64, searchkey string, rl RedisLogin, pl PostgresLogin, awaiting *sync.WaitGroup) {
 	// this is where all of the work happens
 	defer awaiting.Done()
-	logiflogging(fmt.Sprintf("Hello from grabber %d", clientnumber), ll, 3)
+	msg(fmt.Sprintf("Hello from grabber %d", clientnumber), 3)
 
 	rc := grabredisconnection(rl)
 	defer func(rc redis.Conn) {
@@ -57,7 +59,7 @@ func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisL
 		checkerror(err)
 	}(rc)
 
-	dbpool := grabpgsqlconnection(pl, 1, ll)
+	dbpool := grabpgsqlconnection(pl, 1)
 	defer dbpool.Close()
 
 	resultkey := searchkey + "_results"
@@ -70,7 +72,7 @@ func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisL
 		}
 
 		// [ii] - [v] inside findtherows() because its code is common with HipparchiaBagger's needs
-		foundrows := findtherows(thequery, "grabber", searchkey, clientnumber, ll, rc, dbpool)
+		foundrows := findtherows(thequery, "grabber", searchkey, clientnumber, rc, dbpool)
 
 		// [vi] iterate through the finds
 		// don't check-and-load find-by-find because some searches are effectively uncapped
@@ -114,7 +116,7 @@ func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisL
 		checkerror(e)
 
 		// [vi.3] busted the cap?
-		done := checkcap(searchkey, hitcap, clientnumber, ll, rc)
+		done := checkcap(searchkey, hitcap, clientnumber, rc)
 		if done {
 			// trigger the break in the outer loop
 			rcdel(rc, searchkey)
@@ -122,7 +124,7 @@ func grabber(clientnumber int, hitcap int64, searchkey string, ll int, rl RedisL
 	}
 }
 
-func checkcap(searchkey string, cap int64, client int, ll int, rc redis.Conn) bool {
+func checkcap(searchkey string, cap int64, client int, rc redis.Conn) bool {
 	resultkey := searchkey + "_results"
 	hitcount, e := redis.Int64(rc.Do("SCARD", resultkey))
 	checkerror(e)
@@ -130,7 +132,7 @@ func checkcap(searchkey string, cap int64, client int, ll int, rc redis.Conn) bo
 	k := searchkey + "_hitcount"
 	_, ee := rc.Do("SET", k, hitcount)
 	checkerror(ee)
-	logiflogging(fmt.Sprintf("grabber #%d reports that the hitcount is %d", client, hitcount), ll, 3)
+	msg(fmt.Sprintf("grabber #%d reports that the hitcount is %d", client, hitcount), 3)
 	if hitcount >= cap {
 		// trigger the break in the outer loop
 		return true
@@ -139,7 +141,7 @@ func checkcap(searchkey string, cap int64, client int, ll int, rc redis.Conn) bo
 	}
 }
 
-func findtherows(thequery string, thecaller string, searchkey string, clientnumber int, ll int, rc redis.Conn, dbpool *pgxpool.Pool) pgx.Rows {
+func findtherows(thequery string, thecaller string, searchkey string, clientnumber int, rc redis.Conn, dbpool *pgxpool.Pool) pgx.Rows {
 	// called by both grabber() and HipparchiaBagger()
 
 	// [ii] update the polling data
@@ -150,7 +152,7 @@ func findtherows(thequery string, thecaller string, searchkey string, clientnumb
 		k := fmt.Sprintf("%s_remaining", searchkey)
 		_, e := rc.Do("SET", k, remain)
 		checkerror(e)
-		logiflogging(fmt.Sprintf("%s #%d says that %d items remain", thecaller, clientnumber, remain), ll, 3)
+		msg(fmt.Sprintf("%s #%d says that %d items remain", thecaller, clientnumber, remain), 3)
 	}
 
 	// [iii] decode the query
@@ -176,7 +178,7 @@ func findtherows(thequery string, thecaller string, searchkey string, clientnumb
 	return foundrows
 }
 
-func recordinitialsizeofworkpile(k string, loglevel int, rl RedisLogin) {
+func recordinitialsizeofworkpile(k string, rl RedisLogin) {
 	rc := grabredisconnection(rl)
 
 	defer func(rc redis.Conn) {
@@ -190,7 +192,7 @@ func recordinitialsizeofworkpile(k string, loglevel int, rl RedisLogin) {
 	_, e := rc.Do("SET", kk, remain)
 	checkerror(e)
 
-	logiflogging(fmt.Sprintf("recordinitialsizeofworkpile(): initial size of workpile for '%s' is %d", k+"_poolofwork", remain), loglevel, 2)
+	msg(fmt.Sprintf("recordinitialsizeofworkpile(): initial size of workpile for '%s' is %d", k+"_poolofwork", remain), 2)
 }
 
 func fetchfinalnumberofresults(k string, rl RedisLogin) int64 {

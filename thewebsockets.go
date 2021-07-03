@@ -27,30 +27,30 @@ import (
 )
 
 //StartHipparchiaPollWebsocket: fire up our own websocket server because wscheckpoll() in HipparchiaServer is unavailable to golang module users
-func StartHipparchiaPollWebsocket(port int, loglevel int, failthreshold int, saving int, rl RedisLogin) {
-	logiflogging(fmt.Sprintf("WebSocket Module Launched"), loglevel, 1)
-	if loglevel < 2 {
+func StartHipparchiaPollWebsocket(port int, failthreshold int, saving int, rl RedisLogin) {
+	msg(fmt.Sprintf("WebSockets Launched"), 1)
+	if logginglevel < 2 {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	ws := gin.New()
-	msg := melody.New()
+	m := melody.New()
 
 	ws.GET("/", func(c *gin.Context) {
-		e := msg.HandleRequest(c.Writer, c.Request)
+		e := m.HandleRequest(c.Writer, c.Request)
 		if e != nil {
 			fmt.Println("melody choked when it tried to 'HandleRequest'")
 		}
 	})
 
-	msg.HandleMessage(func(s *melody.Session, searchid []byte) {
+	m.HandleMessage(func(s *melody.Session, searchid []byte) {
 		if len(searchid) < 16 {
 			// at this point you have "ebf24e19" and NOT ebf24e19; fix that
 			// id := string(searchid[1 : len(searchid)-1])
 			keycleaner := regexp.MustCompile(`[^a-f0-9]`)
 			id := keycleaner.ReplaceAllString(string(searchid), "")
-			logiflogging(fmt.Sprintf("id is %s", id), loglevel, 1)
-			runpollmessageloop(id, loglevel, failthreshold, saving, rl, msg)
+			msg(fmt.Sprintf("id is %s", id), 1)
+			runpollmessageloop(id, failthreshold, saving, rl, m)
 		}
 	})
 
@@ -58,9 +58,12 @@ func StartHipparchiaPollWebsocket(port int, loglevel int, failthreshold int, sav
 	checkerror(err)
 }
 
-func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving int, rl RedisLogin, msg *melody.Melody) {
+func runpollmessageloop(searchid string, failthreshold int, saving int, rl RedisLogin, m *melody.Melody) {
 	rc := grabredisconnection(rl)
-	defer rc.Close()
+	defer func(rc redis.Conn) {
+		err := rc.Close()
+		checkerror(err)
+	}(rc)
 
 	// note that these are lower case inside of redis, but they get reported as upper-case
 	// this all comes back to problems exporting fields of structs and our use of reflect
@@ -78,43 +81,43 @@ func runpollmessageloop(searchid string, loglevel int, failthreshold int, saving
 	iterations := 0
 	for {
 		iterations += 1
-		logiflogging(fmt.Sprintf("WebSocket server reports that runpollmessageloop() for %s is on iteration #%d", searchid, iterations), loglevel, 1)
+		msg(fmt.Sprintf("WebSocket server reports that runpollmessageloop() for %s is on iteration #%d", searchid, iterations), 1)
 		time.Sleep(pollinginterval)
 		// the flow is a bit fussy, but separation should allow for easier maintenance if/when things
 		// change on HipparchiaServer's end
-		redisvals := retrievepollingdata(searchid, rediskeys, loglevel, rc)
+		redisvals := retrievepollingdata(searchid, rediskeys, rc)
 		cpd := typeconvertpollingdata(searchid, rediskeys, redisvals)
 		jsonreply, err := json.Marshal(cpd)
 		checkerror(err)
-		e := msg.Broadcast(jsonreply)
+		e := m.Broadcast(jsonreply)
 		checkerror(e)
 
 		// rediskeys[1] = "active"
 		if redisvals[1] == "" {
 			// poll does not exist yet or never existed
 			missing += 1
-			logiflogging(fmt.Sprintf("%s_%s = %s ; missing is now %d",
-				searchid, rediskeys[1], redisvals[1], missing), loglevel, 1)
+			msg(fmt.Sprintf("%s_%s = %s ; missing is now %d",
+				searchid, rediskeys[1], redisvals[1], missing), 1)
 		}
 		if redisvals[1] == "no" {
 			missing += 1
-			logiflogging(fmt.Sprintf("%s_%s = %s ; missing is now %d",
-				searchid, rediskeys[1], redisvals[1], missing), loglevel, 1)
+			msg(fmt.Sprintf("%s_%s = %s ; missing is now %d",
+				searchid, rediskeys[1], redisvals[1], missing), 1)
 		}
 		if missing >= failthreshold {
-			logiflogging(fmt.Sprintf("breaking for %s because missing >= failthreshold: %d >= %d",
-				searchid, missing, failthreshold), loglevel, 2)
+			msg(fmt.Sprintf("breaking for %s because missing >= failthreshold: %d >= %d",
+				searchid, missing, failthreshold), 2)
 			break
 		}
 	}
 	if saving < 1 {
-		deletewhendone(searchid, rediskeys, loglevel, rc)
+		deletewhendone(searchid, rediskeys, rc)
 	} else {
-		logiflogging(fmt.Sprintf("retained redis keys for %s", searchid), loglevel, 1)
+		msg(fmt.Sprintf("retained redis keys for %s", searchid), 1)
 	}
 }
 
-func retrievepollingdata(searchid string, rediskeys [8]string, loglevel int, rc redis.Conn) [8]string {
+func retrievepollingdata(searchid string, rediskeys [8]string, rc redis.Conn) [8]string {
 	// grab the data from redis
 	var redisvals [8]string
 	var err error
@@ -125,7 +128,7 @@ func retrievepollingdata(searchid string, rediskeys [8]string, loglevel int, rc 
 			// checkerror(err) will yield "panic: redis: nil"
 			redisvals[i] = ""
 		}
-		logiflogging(fmt.Sprintf("%s_%s = %s", searchid, rediskeys[i], redisvals[i]), loglevel, 3)
+		msg(fmt.Sprintf("%s_%s = %s", searchid, rediskeys[i], redisvals[i]), 3)
 	}
 	return redisvals
 }
@@ -187,7 +190,7 @@ func typeconvertpollingdata(searchid string, rediskeys [8]string, redisvals [8]s
 	return cpd
 }
 
-func deletewhendone(searchid string, rediskeys [8]string, loglevel int, rc redis.Conn) {
+func deletewhendone(searchid string, rediskeys [8]string, rc redis.Conn) {
 	// make sure that the "there is no work" message gets propagated
 	p := fmt.Sprintf("%s_poolofwork", searchid)
 	_, _ = rc.Do("SET", p, -1)
@@ -197,5 +200,5 @@ func deletewhendone(searchid string, rediskeys [8]string, loglevel int, rc redis
 		k := fmt.Sprintf("%s_%s", searchid, rediskeys[i])
 		_, _ = rc.Do("DEL", k)
 	}
-	logiflogging(fmt.Sprintf("deleted redis keys for %s", searchid), loglevel, 2)
+	msg(fmt.Sprintf("deleted redis keys for %s", searchid), 2)
 }

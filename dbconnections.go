@@ -85,13 +85,13 @@ func rcpopstr(c redis.Conn, k string) string {
 // POSTGRESQL
 //
 
-func grabpgsqlconnection(pl PostgresLogin, workers int, loglevel int) *pgxpool.Pool {
+func grabpgsqlconnection(pl PostgresLogin, workers int) *pgxpool.Pool {
 
 	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", pl.User, pl.Pass, pl.Host, pl.Port, pl.DBName)
 
 	config, oops := pgxpool.ParseConfig(url)
 	if oops != nil {
-		logiflogging(fmt.Sprintf("Could not execute pgxpool.ParseConfig(url) via %s", url), loglevel, 0)
+		msg(fmt.Sprintf("Could not execute pgxpool.ParseConfig(url) via %s", url), -1)
 		panic(oops)
 	}
 
@@ -105,11 +105,11 @@ func grabpgsqlconnection(pl PostgresLogin, workers int, loglevel int) *pgxpool.P
 	pooledconnection, err := pgxpool.ConnectConfig(context.Background(), config)
 
 	if err != nil {
-		logiflogging(fmt.Sprintf("Could not connect to PostgreSQL via %s", url), loglevel, 0)
+		msg(fmt.Sprintf("Could not connect to PostgreSQL via %s", url), -1)
 		panic(err)
 	}
 
-	logiflogging(fmt.Sprintf("Connected to %s on PostgreSQL", pl.DBName), loglevel, 2)
+	msg(fmt.Sprintf("Connected to %s on PostgreSQL", pl.DBName), 4)
 
 	return pooledconnection
 }

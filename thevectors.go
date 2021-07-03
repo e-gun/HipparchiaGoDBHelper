@@ -38,10 +38,10 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	// this does not work at the moment if called as a python module
 	// but HipparchiaServer does not know how to call it either...
 	smk := key + "_statusmessage"
-	logiflogging(fmt.Sprintf("Bagger Module Launched"), loglevel, 1)
+	msg(fmt.Sprintf("Vector Bagger Launched"), 1)
 	start := time.Now()
 	previous := time.Now()
-	logiflogging(fmt.Sprintf("Seeking to build *%s* bags of words", baggingmethod), loglevel, 2)
+	msg(fmt.Sprintf("Seeking to build *%s* bags of words", baggingmethod), 2)
 
 	rc := grabredisconnection(rl)
 	defer func(rc redis.Conn) {
@@ -49,9 +49,9 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 		checkerror(err)
 	}(rc)
 
-	logiflogging(fmt.Sprintf("Connected to redis"), loglevel, 2)
+	msg(fmt.Sprintf("Connected to redis"), 2)
 
-	dbpool := grabpgsqlconnection(pl, goroutines, loglevel)
+	dbpool := grabpgsqlconnection(pl, goroutines)
 	defer dbpool.Close()
 
 	// [a] grab the db lines
@@ -64,7 +64,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	dblines := make(map[int]DbWorkline)
 
 	if key == "" {
-		logiflogging(fmt.Sprintf("No redis key; gathering lines with a direct CLI PostgreSQL query"), loglevel, 1)
+		msg(fmt.Sprintf("No redis key; gathering lines with a direct CLI PostgreSQL query"), 1)
 		dblines = fetchdblinesdirectly(thedb, thestart, theend, dbpool)
 	} else {
 		count := 0
@@ -76,7 +76,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 			}
 
 			// [ii] - [v] inside findtherows() because its code is common with grabber's needs
-			foundrows := findtherows(thequery, "bagger", key, 0, loglevel, rc, dbpool)
+			foundrows := findtherows(thequery, "bagger", key, 0, rc, dbpool)
 
 			// [vi] iterate through the finds
 			defer foundrows.Close()
@@ -98,7 +98,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	m := fmt.Sprintf("%d lines acquired", len(dblines))
 	rcsetstr(rc, smk, m)
-	timetracker("A", m, start, previous, loglevel)
+	timetracker("A", m, start, previous)
 	previous = time.Now()
 
 	// [b] turn them into a unified text block
@@ -119,7 +119,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	m = fmt.Sprintf("Unified text block built")
 	rcsetstr(rc, smk, m)
-	timetracker("B", m, start, previous, loglevel)
+	timetracker("B", m, start, previous)
 	previous = time.Now()
 
 	// [c] do some preliminary cleanups
@@ -133,7 +133,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	m = fmt.Sprintf("Preliminary cleanups complete")
 	rcsetstr(rc, smk, m)
-	timetracker("C", m, start, previous, loglevel)
+	timetracker("C", m, start, previous)
 	previous = time.Now()
 
 	// [d] break the text into sentences and assemble []BagWithLocus
@@ -184,7 +184,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	m = fmt.Sprintf("Inserted %d sentences into %d bags", totalsent, len(thebags))
 	rcsetstr(rc, smk, m)
-	timetracker("D", m, start, previous, loglevel)
+	timetracker("D", m, start, previous)
 	previous = time.Now()
 
 	// unlemmatized bags of words customers have in fact reached their target as of now
@@ -195,7 +195,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 		loadthebags(resultkey, goroutines, thebags, rl)
 		// DO NOT comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer
 		// "resultrediskey = resultrediskey.split()[-1]"
-		fmt.Println(fmt.Sprintf("%d %s bags of words stored at %s", len(thebags), baggingmethod, resultkey))
+		fmt.Printf("%d %s bags of words stored at %s", len(thebags), baggingmethod, resultkey)
 		os.Exit(0)
 	}
 
@@ -214,7 +214,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	m = fmt.Sprintf("Found %d distinct words", len(allwords))
 	rcsetstr(rc, smk, m)
-	timetracker("E", m, start, previous, loglevel)
+	timetracker("E", m, start, previous)
 	previous = time.Now()
 
 	// [f] find all of the parsing info relative to these words
@@ -230,7 +230,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	m = fmt.Sprintf("Got morphology for %d terms", len(mo))
 	rcsetstr(rc, smk, m)
-	timetracker("F", m, start, previous, loglevel)
+	timetracker("F", m, start, previous)
 	previous = time.Now()
 
 	// [g] figure out which headwords to associate with the collection of words
@@ -259,7 +259,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	m = fmt.Sprintf("Built morphmap for %d terms", len(morphdict))
 	rcsetstr(rc, smk, m)
-	timetracker("G", m, start, previous, loglevel)
+	timetracker("G", m, start, previous)
 	previous = time.Now()
 
 	// [h] build the lemmatized bags of words
@@ -274,12 +274,12 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 		thebags = buildwinnertakesallbagsofwords(thebags, morphdict, dbpool)
 	default:
 		m = fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", baggingmethod)
-		logiflogging(m, loglevel, 0)
+		msg(m, 0)
 	}
 
 	m = fmt.Sprintf("Finished bagging %d bags", len(thebags))
 	rcsetstr(rc, smk, m)
-	timetracker("H", m, start, previous, loglevel)
+	timetracker("H", m, start, previous)
 	previous = time.Now()
 
 	// [i] purge stopwords
@@ -297,7 +297,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	m = fmt.Sprintf("Cleared stopwords: %d bags remain", len(thebags))
 	rcsetstr(rc, smk, m)
-	timetracker("I", m, start, previous, loglevel)
+	timetracker("I", m, start, previous)
 	previous = time.Now()
 
 	// [J] store...
@@ -308,7 +308,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	m = fmt.Sprintf("Finished loading")
 	rcsetstr(rc, smk, m)
-	timetracker("J", m, start, previous, loglevel)
+	timetracker("J", m, start, previous)
 	previous = time.Now()
 
 	rcsetint(rc, key+"_poolofwork", -1)
@@ -380,8 +380,8 @@ func parallelredisloader(workerid int, resultkey string, bags []BagWithLocus, rl
 	wg.Done()
 }
 
-func timetracker(letter string, m string, start time.Time, previous time.Time, loglevel int) {
+func timetracker(letter string, m string, start time.Time, previous time.Time) {
 	d := fmt.Sprintf("[Δ: %.3fs] ", time.Now().Sub(previous).Seconds())
 	m = fmt.Sprintf("[%s: %.3fs]", letter, time.Now().Sub(start).Seconds()) + d + m
-	logiflogging(m, loglevel, 3)
+	msg(m, 3)
 }
