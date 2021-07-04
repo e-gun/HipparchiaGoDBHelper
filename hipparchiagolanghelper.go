@@ -124,13 +124,13 @@ func main() {
 	configatstartup()
 
 	if *cfg.ProfCPUPtr {
-		o := cpuoutputfile
-		f, err := os.Create(o)
+		b := cpuoutputfile
+		f, err := os.Create(b)
 		if err != nil {
-			msg(fmt.Sprintf("failed to create '%s'", o), -1)
+			msg(fmt.Sprintf("failed to create '%s'", b), -1)
 			checkerror(err)
 		} else {
-			msg(fmt.Sprintf("logging cpu profiling data to '%s'", o), -1)
+			msg(fmt.Sprintf("logging cpu profiling data to '%s'", b), -1)
 		}
 		e := pprof.StartCPUProfile(f)
 		checkerror(e)
@@ -177,13 +177,13 @@ func main() {
 	}
 
 	if *cfg.ProfMemPtr {
-		o := memoutputfile
-		f, err := os.Create(o)
+		b := memoutputfile
+		f, err := os.Create(b)
 		if err != nil {
-			msg(fmt.Sprintf("failed to create '%s'", o), -1)
+			msg(fmt.Sprintf("failed to create '%s'", b), -1)
 			checkerror(err)
 		} else {
-			msg(fmt.Sprintf("logging memory profiling data to '%s'", o), -1)
+			msg(fmt.Sprintf("logging memory profiling data to '%s'", b), -1)
 		}
 		e := pprof.WriteHeapProfile(f)
 		checkerror(e)
