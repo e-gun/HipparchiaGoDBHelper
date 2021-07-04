@@ -165,130 +165,127 @@ after pre-building the possibilities inside of the database...
 
 pipelined redis is fast
 
+% ./HipparchiaGoDBHelper -sv -l 3 -svdb lt0474 -svs 4 -sve 149570 -k "" -t 6 -svbs 1 -p ${L}
 
-% ./HipparchiaGoDBHelper -mprofile -cprofile -sv -l 3 -svdb lt0474 -svs 4 -sve 149570 -k "" -t 6 -svbs 1 -p ${L}
-[HGH] logging cpu profiling data to 'cpu_profiler_output.bin'
-[HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.3.4) [loglevel=3]
-[HGH] Bagger Module Launched
-[HGH] Seeking to build *winnertakesall* bags of words
-[HGH] Connected to redis
-[HGH] Connected to hipparchiaDB on PostgreSQL
-[HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
-[HGH] [A: 0.244s][Δ: 0.244s] 149567 lines acquired
-[HGH] [B: 0.322s][Δ: 0.079s] Unified text block built
-[HGH] [C: 0.472s][Δ: 0.149s] Preliminary cleanups complete
-[HGH] [D: 1.542s][Δ: 1.070s] Inserted 72930 sentences into 72930 bags
-[HGH] [E: 1.608s][Δ: 0.066s] Found 83301 distinct words
-[HGH] [F: 2.119s][Δ: 0.511s] Got morphology for 76492 terms
-[HGH] [G: 2.150s][Δ: 0.030s] Built morphmap for 83469 terms
-[HGH] [H: 2.536s][Δ: 0.387s] Finished bagging 72930 bags
-[HGH] [I: 2.694s][Δ: 0.157s] Cleared stopwords: 71833 bags remain
-[HGH] [J: 2.843s][Δ: 0.149s] Finished loading
-[HGH] logging memory profiling data to 'mem_profiler_output.bin'
-bags have been stored at _vectorresults%
+  [HGH] Hipparchia Golang Helper CLI Debugging Interface (v.1.4.1) [loglevel=3]
+  [HGH] Vector Bagger Launched
+  [HGH] Seeking to build *winnertakesall* bags of words
+  [HGH] Connected to redis
+  [HGH] No redis key; gathering lines with a direct CLI PostgreSQL query
+  [HGH] [A: 0.206s][Δ: 0.206s] 149567 lines acquired
+  [HGH] [B: 0.298s][Δ: 0.092s] Unified text block built
+  [HGH] [C: 0.480s][Δ: 0.182s] Preliminary cleanups complete
+  [HGH] [D: 1.653s][Δ: 1.173s] Inserted 72930 sentences into 72930 bags
+  [HGH] [E: 1.722s][Δ: 0.069s] Found 83267 distinct words
+  [HGH] [F: 2.200s][Δ: 0.478s] Got morphology for 76646 terms
+  [HGH] [G: 2.229s][Δ: 0.029s] Built morphmap for 83445 terms
+  [HGH] [H: 2.604s][Δ: 0.376s] Finished bagging 72930 bags
+  [HGH] [I: 2.762s][Δ: 0.158s] Cleared stopwords: 71830 bags remain
+  [HGH] [J: 2.903s][Δ: 0.141s] Finished loading
+  bags have been stored at _vectorresults%
 
+// ./HipparchiaGoDBHelper -mprofile -cprofile -sv -l 3 -svdb lt0474 -svs 4 -sve 149570 -k "" -t 6 -svbs 1 -p ${L}
 
 1069 •erik@big-sur-box• e-gun/HipparchiaGoDBHelper/ % go tool pprof ./HipparchiaGoDBHelper ./cpu_profiler_output.bin
 File: HipparchiaGoDBHelper
 Type: cpu
-Time: Jul 2, 2021 at 12:27pm (EDT)
-Duration: 2.87s, Total samples = 2.67s (93.08%)
+Time: Jul 4, 2021 at 11:41am (EDT)
+Duration: 3.20s, Total samples = 2.84s (88.84%)
 Entering interactive mode (type "help" for commands, "o" for options)
 (pprof) top 25
-Showing nodes accounting for 1810ms, 67.79% of 2670ms total
-Dropped 99 nodes (cum <= 13.35ms)
-Showing top 25 nodes out of 212
+Showing nodes accounting for 2000ms, 70.42% of 2840ms total
+Dropped 84 nodes (cum <= 14.20ms)
+Showing top 25 nodes out of 217
       flat  flat%   sum%        cum   cum%
-     240ms  8.99%  8.99%      240ms  8.99%  runtime.memmove
-     190ms  7.12% 16.10%      190ms  7.12%  syscall.syscall
-     180ms  6.74% 22.85%      180ms  6.74%  runtime.kevent
-     140ms  5.24% 28.09%      320ms 11.99%  regexp.(*Regexp).tryBacktrack
-     130ms  4.87% 32.96%      130ms  4.87%  runtime.madvise
-      90ms  3.37% 36.33%       90ms  3.37%  regexp/syntax.(*Inst).MatchRunePos
-      90ms  3.37% 39.70%      260ms  9.74%  runtime.netpoll
-      70ms  2.62% 42.32%       70ms  2.62%  runtime.usleep
-      50ms  1.87% 44.19%      280ms 10.49%  regexp/syntax.(*parser).parseClass
-      50ms  1.87% 46.07%       50ms  1.87%  runtime.heapBitsSetType
-      50ms  1.87% 47.94%       50ms  1.87%  runtime.memclrNoHeapPointers
-      50ms  1.87% 49.81%       50ms  1.87%  runtime.pthread_cond_wait
-      50ms  1.87% 51.69%       80ms  3.00%  runtime.stkbucket
-      50ms  1.87% 53.56%       60ms  2.25%  strings.(*genericReplacer).WriteString
-      50ms  1.87% 55.43%       50ms  1.87%  unicode/utf8.DecodeRuneInString
-      40ms  1.50% 56.93%       40ms  1.50%  indexbytebody
-      40ms  1.50% 58.43%       50ms  1.87%  runtime.evacuate_faststr
-      40ms  1.50% 59.93%       40ms  1.50%  runtime.nanotime1
-      30ms  1.12% 61.05%      250ms  9.36%  main.buildwinnertakesallbagsofwords
-      30ms  1.12% 62.17%      130ms  4.87%  main.fetchdblinesdirectly
-      30ms  1.12% 63.30%       30ms  1.12%  regexp.(*bitState).shouldVisit (inline)
-      30ms  1.12% 64.42%       40ms  1.50%  regexp.(*inputString).step
-      30ms  1.12% 65.54%       80ms  3.00%  regexp/syntax.(*parser).parseClassChar
-      30ms  1.12% 66.67%       30ms  1.12%  regexp/syntax.ranges.Less
-      30ms  1.12% 67.79%       30ms  1.12%  regexp/syntax.ranges.Swap
+     270ms  9.51%  9.51%      390ms 13.73%  regexp.(*Regexp).tryBacktrack
+     170ms  5.99% 15.49%      170ms  5.99%  syscall.syscall
+     130ms  4.58% 20.07%      130ms  4.58%  runtime.kevent
+     130ms  4.58% 24.65%      140ms  4.93%  runtime.stkbucket
+     120ms  4.23% 28.87%      120ms  4.23%  runtime.madvise
+     120ms  4.23% 33.10%      120ms  4.23%  runtime.memmove
+     120ms  4.23% 37.32%      250ms  8.80%  runtime.netpoll
+      80ms  2.82% 40.14%       80ms  2.82%  regexp/syntax.ranges.Less
+      70ms  2.46% 42.61%       70ms  2.46%  regexp/syntax.(*Inst).MatchRunePos
+      70ms  2.46% 45.07%       70ms  2.46%  runtime.heapBitsSetType
+      70ms  2.46% 47.54%      400ms 14.08%  runtime.mallocgc
+      70ms  2.46% 50.00%       70ms  2.46%  runtime.pthread_cond_wait
+      70ms  2.46% 52.46%       70ms  2.46%  strings.(*genericReplacer).WriteString
+      60ms  2.11% 54.58%      270ms  9.51%  regexp/syntax.(*parser).parseClass
+      50ms  1.76% 56.34%       80ms  2.82%  runtime.mapaccess1_faststr
+      50ms  1.76% 58.10%       50ms  1.76%  runtime.pthread_cond_signal
+      50ms  1.76% 59.86%       50ms  1.76%  runtime.usleep
+      40ms  1.41% 61.27%       40ms  1.41%  aeshashbody
+      40ms  1.41% 62.68%       90ms  3.17%  runtime.mapassign_faststr
+      40ms  1.41% 64.08%       40ms  1.41%  runtime.memclrNoHeapPointers
+      40ms  1.41% 65.49%       40ms  1.41%  runtime.nanotime1
+      40ms  1.41% 66.90%       40ms  1.41%  runtime.pthread_kill
+      40ms  1.41% 68.31%      150ms  5.28%  runtime.scanobject
+      30ms  1.06% 69.37%      210ms  7.39%  main.buildwinnertakesallbagsofwords
+      30ms  1.06% 70.42%      100ms  3.52%  main.fetchdblinesdirectly
 (pprof) top25 -cum
-Showing nodes accounting for 0.62s, 23.22% of 2.67s total
-Dropped 99 nodes (cum <= 0.01s)
-Showing top 25 nodes out of 212
+Showing nodes accounting for 0.61s, 21.48% of 2.84s total
+Dropped 84 nodes (cum <= 0.01s)
+Showing top 25 nodes out of 217
       flat  flat%   sum%        cum   cum%
-     0.01s  0.37%  0.37%      1.77s 66.29%  main.HipparchiaBagger
-         0     0%  0.37%      1.77s 66.29%  main.main
-         0     0%  0.37%      1.77s 66.29%  runtime.main
-     0.01s  0.37%  0.75%      0.74s 27.72%  main.stripper
-         0     0%  0.75%      0.53s 19.85%  runtime.systemstack
-         0     0%  0.75%      0.40s 14.98%  regexp.(*Regexp).doExecute
-         0     0%  0.75%      0.39s 14.61%  regexp.Compile (inline)
-         0     0%  0.75%      0.39s 14.61%  regexp.MustCompile
-     0.01s  0.37%  1.12%      0.39s 14.61%  regexp.compile
-         0     0%  1.12%      0.37s 13.86%  regexp.(*Regexp).backtrack
-         0     0%  1.12%      0.36s 13.48%  regexp/syntax.Parse
-         0     0%  1.12%      0.34s 12.73%  regexp.(*Regexp).ReplaceAllString
-         0     0%  1.12%      0.34s 12.73%  regexp.(*Regexp).replaceAll
-     0.14s  5.24%  6.37%      0.32s 11.99%  regexp.(*Regexp).tryBacktrack
-     0.02s  0.75%  7.12%      0.32s 11.99%  runtime.mallocgc
-     0.05s  1.87%  8.99%      0.28s 10.49%  regexp/syntax.(*parser).parseClass
-         0     0%  8.99%      0.28s 10.49%  runtime.gcBgMarkWorker.func2
-         0     0%  8.99%      0.28s 10.49%  runtime.gcDrain
-         0     0%  8.99%      0.28s 10.49%  runtime.mstart
-     0.09s  3.37% 12.36%      0.26s  9.74%  runtime.netpoll
-     0.03s  1.12% 13.48%      0.25s  9.36%  main.buildwinnertakesallbagsofwords
-     0.02s  0.75% 14.23%      0.24s  8.99%  runtime.growslice
-     0.24s  8.99% 23.22%      0.24s  8.99%  runtime.memmove
-         0     0% 23.22%      0.22s  8.24%  runtime.mcall
-         0     0% 23.22%      0.22s  8.24%  runtime.schedule
+     0.01s  0.35%  0.35%      1.91s 67.25%  main.HipparchiaVectors
+         0     0%  0.35%      1.91s 67.25%  main.main
+         0     0%  0.35%      1.91s 67.25%  runtime.main
+         0     0%  0.35%      1.01s 35.56%  main.stripper
+         0     0%  0.35%      0.57s 20.07%  runtime.systemstack
+         0     0%  0.35%      0.55s 19.37%  regexp.(*Regexp).ReplaceAllString
+     0.01s  0.35%   0.7%      0.52s 18.31%  regexp.(*Regexp).replaceAll
+     0.01s  0.35%  1.06%      0.48s 16.90%  regexp.(*Regexp).doExecute
+         0     0%  1.06%      0.46s 16.20%  regexp.Compile (inline)
+         0     0%  1.06%      0.46s 16.20%  regexp.MustCompile
+         0     0%  1.06%      0.46s 16.20%  regexp.compile
+     0.02s   0.7%  1.76%      0.41s 14.44%  regexp.(*Regexp).backtrack
+     0.07s  2.46%  4.23%      0.40s 14.08%  runtime.mallocgc
+     0.27s  9.51% 13.73%      0.39s 13.73%  regexp.(*Regexp).tryBacktrack
+         0     0% 13.73%      0.36s 12.68%  regexp/syntax.Parse
+         0     0% 13.73%      0.32s 11.27%  runtime.gcBgMarkWorker.func2
+         0     0% 13.73%      0.32s 11.27%  runtime.gcDrain
+         0     0% 13.73%      0.29s 10.21%  runtime.mstart
+     0.06s  2.11% 15.85%      0.27s  9.51%  regexp/syntax.(*parser).parseClass
+         0     0% 15.85%      0.25s  8.80%  runtime.gcBgMarkWorker
+     0.12s  4.23% 20.07%      0.25s  8.80%  runtime.netpoll
+     0.01s  0.35% 20.42%      0.24s  8.45%  runtime.growslice
+     0.03s  1.06% 21.48%      0.21s  7.39%  main.buildwinnertakesallbagsofwords
+         0     0% 21.48%      0.21s  7.39%  runtime.schedule
+         0     0% 21.48%      0.20s  7.04%  runtime.mcall
 (pprof) web
 
 
 1082 •erik@big-sur-box• e-gun/HipparchiaGoDBHelper/ % go tool pprof HipparchiaGoDBHelper ./mem_profiler_output.bin
-
+File: HipparchiaGoDBHelper
+Type: inuse_space
+Time: Jul 4, 2021 at 11:41am (EDT)
+Entering interactive mode (type "help" for commands, "o" for options)
 (pprof) top10
-Showing nodes accounting for 19321.91kB, 100% of 19321.91kB total
-Showing top 10 nodes out of 11
+Showing nodes accounting for 18.87MB, 100% of 18.87MB total
       flat  flat%   sum%        cum   cum%
-   11856kB 61.36% 61.36%    11856kB 61.36%  strings.(*genericReplacer).Replace
- 4608.59kB 23.85% 85.21%  4608.59kB 23.85%  strings.(*Builder).grow (inline)
- 2345.25kB 12.14% 97.35% 19321.91kB   100%  main.HipparchiaBagger
-  512.06kB  2.65%   100%   512.06kB  2.65%  main.stopworddropper (inline)
-         0     0%   100%  5120.66kB 26.50%  main.dropstopwords
-         0     0%   100% 19321.91kB   100%  main.main
-         0     0%   100%    11856kB 61.36%  main.splitonpunctuaton
-         0     0%   100% 19321.91kB   100%  runtime.main
-         0     0%   100%  4608.59kB 23.85%  strings.(*Builder).Grow (inline)
-         0     0%   100%    11856kB 61.36%  strings.(*Replacer).Replace
-
+   11.58MB 61.36% 61.36%    11.58MB 61.36%  strings.(*genericReplacer).Replace
+       5MB 26.50% 87.86%        5MB 26.50%  strings.(*Builder).grow (inline)
+    2.29MB 12.14%   100%    18.87MB   100%  main.HipparchiaVectors
+         0     0%   100%        5MB 26.50%  main.dropstopwords
+         0     0%   100%    18.87MB   100%  main.main
+         0     0%   100%    11.58MB 61.36%  main.splitonpunctuaton
+         0     0%   100%    18.87MB   100%  runtime.main
+         0     0%   100%        5MB 26.50%  strings.(*Builder).Grow (inline)
+         0     0%   100%    11.58MB 61.36%  strings.(*Replacer).Replace
+         0     0%   100%        5MB 26.50%  strings.Join
 (pprof) top10 -cum
-Showing nodes accounting for 18.37MB, 97.35% of 18.87MB total
-Showing top 10 nodes out of 11
+Showing nodes accounting for 18.87MB, 100% of 18.87MB total
       flat  flat%   sum%        cum   cum%
-    2.29MB 12.14% 12.14%    18.87MB   100%  main.HipparchiaBagger
+    2.29MB 12.14% 12.14%    18.87MB   100%  main.HipparchiaVectors
          0     0% 12.14%    18.87MB   100%  main.main
          0     0% 12.14%    18.87MB   100%  runtime.main
          0     0% 12.14%    11.58MB 61.36%  main.splitonpunctuaton
          0     0% 12.14%    11.58MB 61.36%  strings.(*Replacer).Replace
    11.58MB 61.36% 73.50%    11.58MB 61.36%  strings.(*genericReplacer).Replace
          0     0% 73.50%        5MB 26.50%  main.dropstopwords
-         0     0% 73.50%     4.50MB 23.85%  strings.(*Builder).Grow (inline)
-    4.50MB 23.85% 97.35%     4.50MB 23.85%  strings.(*Builder).grow (inline)
-         0     0% 97.35%     4.50MB 23.85%  strings.Join
-
+         0     0% 73.50%        5MB 26.50%  strings.(*Builder).Grow (inline)
+       5MB 26.50%   100%        5MB 26.50%  strings.(*Builder).grow (inline)
+         0     0%   100%        5MB 26.50%  strings.Join
 
 // fyi:
 //  https://segment.com/blog/allocation-efficiency-in-high-performance-go-services/
