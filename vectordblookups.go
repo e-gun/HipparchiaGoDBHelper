@@ -35,8 +35,11 @@ func fetchdblinesdirectly(thedb string, thestart int, theend int, dbpool *pgxpoo
 	return dblines
 }
 
-func getrequiredmorphobjects(wordlist []string, workers int, pl PostgresLogin) map[string]DbMorphology {
+func getrequiredmorphobjects(wordlist []string) map[string]DbMorphology {
 	// run arraytogetrequiredmorphobjects once for each language
+	workers := cfg.WorkerCount
+	pl := cfg.PGLogin
+
 	latintest := regexp.MustCompile(`[a-z]`)
 	var latinwords []string
 	var greekwords []string
@@ -107,12 +110,12 @@ func arraytogetrequiredmorphobjects(wordlist []string, uselang string, workercou
 		wg.Add(1)
 		// "i" will be captured if sent into the function
 		j := i
-		go func(wordlist []string, uselang string, workerid int, pl PostgresLogin) {
+		go func(wordlist []string, uselang string, workerid int) {
 			defer wg.Done()
-			dbp := grabpgsqlconnection(pl, 1)
+			dbp := grabpgsqlconnection()
 			defer dbp.Close()
 			outputchannels <- morphologyworker(wordmap[j], uselang, j, 0, dbp)
-		}(wordmap[i], uselang, i, pl)
+		}(wordmap[i], uselang, i)
 	}
 
 	go func() {

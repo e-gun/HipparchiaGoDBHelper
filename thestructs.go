@@ -85,3 +85,29 @@ type CompositePollingData struct {
 	Notes         string
 	ID            string // this is not stored in redis; it is asserted here
 }
+
+type TheConfiguration struct {
+	RedisKey    string
+	MaxHits     int64
+	WorkerCount int
+	LogLevel    int
+	RedisInfo   string
+	PosgresInfo string
+	BagMethod   string
+	SentPerBag  int
+	VectTestDB  string
+	VectStart   int
+	VectEnd     int
+	VSkipHW     string
+	VSkipInf    string
+	IsVectPtr   *bool
+	IsWSPtr     *bool
+	WSPort      int
+	WSFail      int
+	WSSave      int
+	ProfCPUPtr  *bool
+	ProfMemPtr  *bool
+	SendVersPtr *bool
+	RLogin      RedisLogin
+	PGLogin     PostgresLogin
+}

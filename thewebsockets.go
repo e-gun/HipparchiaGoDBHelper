@@ -27,9 +27,11 @@ import (
 )
 
 //StartHipparchiaPollWebsocket: fire up our own websocket server because wscheckpoll() in HipparchiaServer is unavailable to golang module users
-func StartHipparchiaPollWebsocket(port int, failthreshold int, saving int, rl RedisLogin) {
+func HipparchiaWebsocket() {
+	port := cfg.WSPort
+
 	msg(fmt.Sprintf("WebSockets Launched"), 1)
-	if logginglevel < 2 {
+	if cfg.LogLevel < 2 {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
@@ -50,7 +52,7 @@ func StartHipparchiaPollWebsocket(port int, failthreshold int, saving int, rl Re
 			keycleaner := regexp.MustCompile(`[^a-f0-9]`)
 			id := keycleaner.ReplaceAllString(string(searchid), "")
 			msg(fmt.Sprintf("id is %s", id), 1)
-			runpollmessageloop(id, failthreshold, saving, rl, m)
+			runpollmessageloop(id, m)
 		}
 	})
 
@@ -58,8 +60,11 @@ func StartHipparchiaPollWebsocket(port int, failthreshold int, saving int, rl Re
 	checkerror(err)
 }
 
-func runpollmessageloop(searchid string, failthreshold int, saving int, rl RedisLogin, m *melody.Melody) {
-	rc := grabredisconnection(rl)
+func runpollmessageloop(searchid string, m *melody.Melody) {
+	failthreshold := cfg.WSFail
+	saving := cfg.WSSave
+
+	rc := grabredisconnection()
 	defer func(rc redis.Conn) {
 		err := rc.Close()
 		checkerror(err)

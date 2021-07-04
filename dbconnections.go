@@ -19,11 +19,11 @@ var (
 // REDIS
 //
 
-func grabredisconnection(rl RedisLogin) redis.Conn {
+func grabredisconnection() redis.Conn {
 	// to test that we really are pooling:
 	// if you uncomment the two Printfs you will see one and only one "called" vs multiple "grabbed"
 	if RedisPool == nil {
-		poolinit(rl)
+		poolinit()
 		// fmt.Printf("poolinit() called\n")
 	}
 	connection := RedisPool.Get()
@@ -31,8 +31,8 @@ func grabredisconnection(rl RedisLogin) redis.Conn {
 	return connection
 }
 
-func poolinit(rl RedisLogin) {
-	RedisPool = newPool(rl.Addr)
+func poolinit() {
+	RedisPool = newPool(cfg.RLogin.Addr)
 	cleanupHook()
 }
 
@@ -85,7 +85,9 @@ func rcpopstr(c redis.Conn, k string) string {
 // POSTGRESQL
 //
 
-func grabpgsqlconnection(pl PostgresLogin, workers int) *pgxpool.Pool {
+func grabpgsqlconnection() *pgxpool.Pool {
+	pl := cfg.PGLogin
+	workers := cfg.WorkerCount
 
 	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", pl.User, pl.Pass, pl.Host, pl.Port, pl.DBName)
 
@@ -96,8 +98,8 @@ func grabpgsqlconnection(pl PostgresLogin, workers int) *pgxpool.Pool {
 	}
 
 	config.ConnConfig.PreferSimpleProtocol = true
-	config.MaxConns = int32((workers + 2) * 2)
-	config.MinConns = int32(workers + 2)
+	config.MaxConns = int32((workers) * 2)
+	config.MinConns = int32(workers)
 
 	// the boring way if you don't want to go via pgxpool.ParseConfig(url)
 	// pooledconnection, err := pgxpool.Connect(context.Background(), url)

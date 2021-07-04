@@ -32,18 +32,41 @@ import (
 	"time"
 )
 
-//HipparchiaBagger: Take a key; grab lines; bag them; store them
-func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize int, thedb string, thestart int, theend int,
+// ExternalBagger : Take a key; grab lines; bag them; store them. This is a hook for calling via the
+// module interface for HipparchiaServer. Module use currently not implemented on the server side.
+// Instead the CLI will send you to HipparchiaVectors()
+func ExternalBagger(key string, baggingmethod string, goroutines int, bagsize int, thedb string, thestart int, theend int,
 	loglevel int, headwordstoskip string, inflectedtoskip string, rl RedisLogin, pl PostgresLogin) string {
+
+	cfg.RedisKey = key
+	cfg.BagMethod = baggingmethod
+	cfg.WorkerCount = goroutines
+	cfg.SentPerBag = bagsize
+	cfg.VectTestDB = thedb
+	cfg.VectStart = thestart
+	cfg.VectEnd = theend
+	cfg.LogLevel = loglevel
+	cfg.VSkipHW = headwordstoskip
+	cfg.VSkipInf = inflectedtoskip
+	cfg.RLogin = rl
+	cfg.PGLogin = pl
+
+	results := HipparchiaVectors()
+
+	return results
+}
+
+func HipparchiaVectors() string {
 	// this does not work at the moment if called as a python module
 	// but HipparchiaServer does not know how to call it either...
+	key := cfg.RedisKey
 	smk := key + "_statusmessage"
 	msg(fmt.Sprintf("Vector Bagger Launched"), 1)
 	start := time.Now()
 	previous := time.Now()
-	msg(fmt.Sprintf("Seeking to build *%s* bags of words", baggingmethod), 2)
+	msg(fmt.Sprintf("Seeking to build *%s* bags of words", cfg.BagMethod), 2)
 
-	rc := grabredisconnection(rl)
+	rc := grabredisconnection()
 	defer func(rc redis.Conn) {
 		err := rc.Close()
 		checkerror(err)
@@ -51,7 +74,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	msg(fmt.Sprintf("Connected to redis"), 2)
 
-	dbpool := grabpgsqlconnection(pl, goroutines)
+	dbpool := grabpgsqlconnection()
 	defer dbpool.Close()
 
 	// [a] grab the db lines
@@ -65,7 +88,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	if key == "" {
 		msg(fmt.Sprintf("No redis key; gathering lines with a direct CLI PostgreSQL query"), 1)
-		dblines = fetchdblinesdirectly(thedb, thestart, theend, dbpool)
+		dblines = fetchdblinesdirectly(cfg.VectTestDB, cfg.VectStart, cfg.VectEnd, dbpool)
 	} else {
 		count := 0
 		for {
@@ -159,11 +182,11 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	re := regexp.MustCompile(tagger)
 
 	totalsent := len(ss)
-	iterations := len(ss) / bagsize
+	iterations := len(ss) / cfg.SentPerBag
 	index := 0
 	for i := 0; i < iterations; i++ {
-		parcel := strings.Join(ss[index:index+bagsize], " ")
-		index = index + bagsize
+		parcel := strings.Join(ss[index:index+cfg.SentPerBag], " ")
+		index = index + cfg.SentPerBag
 		tags := re.FindAllStringSubmatch(parcel, -1)
 		if len(tags) > 0 {
 			first = tags[0][1]
@@ -188,14 +211,14 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	previous = time.Now()
 
 	// unlemmatized bags of words customers have in fact reached their target as of now
-	if baggingmethod == "unlemmatized" {
-		thebags = dropstopwords(inflectedtoskip, thebags)
+	if cfg.BagMethod == "unlemmatized" {
+		thebags = dropstopwords(cfg.VSkipInf, thebags)
 		kk := strings.Split(key, "_")
 		resultkey := kk[0] + "_vectorresults"
-		loadthebags(resultkey, goroutines, thebags, rl)
+		loadthebags(resultkey, thebags)
 		// DO NOT comment out the fmt.Printf(): the resultkey is parsed by HipparchiaServer
 		// "resultrediskey = resultrediskey.split()[-1]"
-		fmt.Printf("%d %s bags of words stored at %s", len(thebags), baggingmethod, resultkey)
+		fmt.Printf("%d %s bags of words stored at %s", len(thebags), cfg.BagMethod, resultkey)
 		os.Exit(0)
 	}
 
@@ -226,7 +249,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	}
 
 	var mo map[string]DbMorphology
-	mo = getrequiredmorphobjects(thewords, goroutines, pl)
+	mo = getrequiredmorphobjects(thewords)
 
 	m = fmt.Sprintf("Got morphology for %d terms", len(mo))
 	rcsetstr(rc, smk, m)
@@ -264,7 +287,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 
 	// [h] build the lemmatized bags of words
 
-	switch baggingmethod {
+	switch cfg.BagMethod {
 	// see vectorparsingandbagging.go
 	case "flat":
 		thebags = buildflatbagsofwords(thebags, morphdict)
@@ -273,7 +296,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	case "winnertakesall":
 		thebags = buildwinnertakesallbagsofwords(thebags, morphdict, dbpool)
 	default:
-		m = fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", baggingmethod)
+		m = fmt.Sprintf("unknown bagging method '%s'; storing unlemmatized bags", cfg.BagMethod)
 		msg(m, 0)
 	}
 
@@ -283,8 +306,8 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	previous = time.Now()
 
 	// [i] purge stopwords
-	thebags = dropstopwords(headwordstoskip, thebags)
-	thebags = dropstopwords(inflectedtoskip, thebags)
+	thebags = dropstopwords(cfg.VSkipHW, thebags)
+	thebags = dropstopwords(cfg.VSkipInf, thebags)
 
 	var clearedlist []BagWithLocus
 	for i := 0; i < len(thebags); i++ {
@@ -304,7 +327,7 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	kk := strings.Split(key, "_")
 	resultkey := kk[0] + "_vectorresults"
 
-	loadthebags(resultkey, goroutines, thebags, rl)
+	loadthebags(resultkey, thebags)
 
 	m = fmt.Sprintf("Finished loading")
 	rcsetstr(rc, smk, m)
@@ -317,43 +340,43 @@ func HipparchiaBagger(key string, baggingmethod string, goroutines int, bagsize 
 	return resultkey
 }
 
-func loadthebags(resultkey string, goroutines int, sentences []BagWithLocus, rl RedisLogin) {
+func loadthebags(resultkey string, sentences []BagWithLocus) {
 	totalwork := len(sentences)
-	chunksize := totalwork / goroutines
-	leftover := totalwork % goroutines
-	bagsofbags := make(map[int][]BagWithLocus, goroutines)
+	chunksize := totalwork / cfg.WorkerCount
+	leftover := totalwork % cfg.WorkerCount
+	bagsofbags := make(map[int][]BagWithLocus, cfg.WorkerCount)
 
-	if totalwork <= goroutines {
+	if totalwork <= cfg.WorkerCount {
 		bagsofbags[0] = sentences
 	} else {
 		thestart := 0
-		for i := 0; i < goroutines; i++ {
+		for i := 0; i < cfg.WorkerCount; i++ {
 			bagsofbags[i] = sentences[thestart : thestart+chunksize]
 			thestart = thestart + chunksize
 		}
 
 		// leave no sentence behind!
 		if leftover > 0 {
-			bagsofbags[goroutines-1] = append(bagsofbags[goroutines-1], sentences[totalwork-leftover-1:totalwork-1]...)
+			bagsofbags[cfg.WorkerCount-1] = append(bagsofbags[cfg.WorkerCount-1], sentences[totalwork-leftover-1:totalwork-1]...)
 		}
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < goroutines; i++ {
+	for i := 0; i < cfg.WorkerCount; i++ {
 		wg.Add(1)
-		go parallelredisloader(i, resultkey, bagsofbags[i], rl, &wg)
+		go parallelredisloader(i, resultkey, bagsofbags[i], &wg)
 	}
 	wg.Wait()
 }
 
-func parallelredisloader(workerid int, resultkey string, bags []BagWithLocus, rl RedisLogin, wg *sync.WaitGroup) {
+func parallelredisloader(workerid int, resultkey string, bags []BagWithLocus, wg *sync.WaitGroup) {
 	// make sure that "0" comes in last so you can watch the parallelism
 	//if workerid == 0 {
 	//	time.Sleep(pollinginterval)
 	//	time.Sleep(pollinginterval)
 	//}
 
-	rc := grabredisconnection(rl)
+	rc := grabredisconnection()
 	defer func(rc redis.Conn) {
 		err := rc.Close()
 		checkerror(err)

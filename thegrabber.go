@@ -24,42 +24,55 @@ import (
 	"sync"
 )
 
-//HipparchiaGolangSearcher: Execute a series of SQL queries stored in redis by dispatching a collection of goroutines
+// HipparchiaGolangSearcher : Execute a series of SQL queries stored in redis by dispatching a collection of goroutines
+// the python module calls this; you set up 'cfg' and then hand off to HipparchiaSearcher()
 func HipparchiaGolangSearcher(thekey string, hitcap int64, workercount int, ll int, rl RedisLogin, pl PostgresLogin) string {
+	cfg.RedisKey = thekey
+	cfg.MaxHits = hitcap
+	cfg.WorkerCount = workercount
+	cfg.LogLevel = ll
+	cfg.RLogin = rl
+	cfg.PGLogin = pl
+
+	resultkey := HipparchiaSearcher()
+	return resultkey
+}
+
+func HipparchiaSearcher() string {
 	// this is the code that the python module version is calling instead of main()
 	// that also means that the module needs to be able to set the logging level
-	logginglevel = ll
+
 	msg(fmt.Sprintf("Searcher Launched"), 1)
 
-	runtime.GOMAXPROCS(workercount + 1)
+	runtime.GOMAXPROCS(cfg.WorkerCount + 1)
 
-	recordinitialsizeofworkpile(thekey, rl)
+	recordinitialsizeofworkpile(cfg.RedisKey)
 
 	var awaiting sync.WaitGroup
 
-	for i := 0; i < workercount; i++ {
+	for i := 0; i < cfg.WorkerCount; i++ {
 		awaiting.Add(1)
-		go grabber(i, hitcap, thekey, rl, pl, &awaiting)
+		go grabber(i, cfg.RedisKey, &awaiting)
 	}
 
 	awaiting.Wait()
 
-	resultkey := thekey + "_results"
+	resultkey := cfg.RedisKey + "_results"
 	return resultkey
 }
 
-func grabber(clientnumber int, hitcap int64, searchkey string, rl RedisLogin, pl PostgresLogin, awaiting *sync.WaitGroup) {
+func grabber(clientnumber int, searchkey string, awaiting *sync.WaitGroup) {
 	// this is where all of the work happens
 	defer awaiting.Done()
 	msg(fmt.Sprintf("Hello from grabber %d", clientnumber), 3)
 
-	rc := grabredisconnection(rl)
+	rc := grabredisconnection()
 	defer func(rc redis.Conn) {
 		err := rc.Close()
 		checkerror(err)
 	}(rc)
 
-	dbpool := grabpgsqlconnection(pl, 1)
+	dbpool := grabpgsqlconnection()
 	defer dbpool.Close()
 
 	resultkey := searchkey + "_results"
@@ -116,7 +129,7 @@ func grabber(clientnumber int, hitcap int64, searchkey string, rl RedisLogin, pl
 		checkerror(e)
 
 		// [vi.3] busted the cap?
-		done := checkcap(searchkey, hitcap, clientnumber, rc)
+		done := checkcap(searchkey, clientnumber, rc)
 		if done {
 			// trigger the break in the outer loop
 			rcdel(rc, searchkey)
@@ -124,7 +137,7 @@ func grabber(clientnumber int, hitcap int64, searchkey string, rl RedisLogin, pl
 	}
 }
 
-func checkcap(searchkey string, cap int64, client int, rc redis.Conn) bool {
+func checkcap(searchkey string, client int, rc redis.Conn) bool {
 	resultkey := searchkey + "_results"
 	hitcount, e := redis.Int64(rc.Do("SCARD", resultkey))
 	checkerror(e)
@@ -133,7 +146,7 @@ func checkcap(searchkey string, cap int64, client int, rc redis.Conn) bool {
 	_, ee := rc.Do("SET", k, hitcount)
 	checkerror(ee)
 	msg(fmt.Sprintf("grabber #%d reports that the hitcount is %d", client, hitcount), 3)
-	if hitcount >= cap {
+	if hitcount >= cfg.MaxHits {
 		// trigger the break in the outer loop
 		return true
 	} else {
@@ -178,8 +191,8 @@ func findtherows(thequery string, thecaller string, searchkey string, clientnumb
 	return foundrows
 }
 
-func recordinitialsizeofworkpile(k string, rl RedisLogin) {
-	rc := grabredisconnection(rl)
+func recordinitialsizeofworkpile(k string) {
+	rc := grabredisconnection()
 
 	defer func(rc redis.Conn) {
 		err := rc.Close()
@@ -195,8 +208,8 @@ func recordinitialsizeofworkpile(k string, rl RedisLogin) {
 	msg(fmt.Sprintf("recordinitialsizeofworkpile(): initial size of workpile for '%s' is %d", k+"_poolofwork", remain), 2)
 }
 
-func fetchfinalnumberofresults(k string, rl RedisLogin) int64 {
-	rc := grabredisconnection(rl)
+func fetchfinalnumberofresults(k string) int64 {
+	rc := grabredisconnection()
 
 	defer func(rc redis.Conn) {
 		err := rc.Close()
