@@ -88,7 +88,7 @@ func HipparchiaVectors() string {
 
 	if key == "" {
 		msg(fmt.Sprintf("No redis key; gathering lines with a direct CLI PostgreSQL query"), 1)
-		dblines = fetchdblinesdirectly(cfg.VectTestDB, cfg.VectStart, cfg.VectEnd, dbpool)
+		dblines = fetchdblinesdirectly(dbpool)
 	} else {
 		count := 0
 		for {
@@ -179,7 +179,7 @@ func HipparchiaVectors() string {
 	var last string
 
 	const tagger = `⊏(.*?)⊐`
-	const notachar = `[^\sa-zα-ωϲϹἀἁἂἃἄἅἆἇᾀᾁᾂᾃᾄᾅᾆᾇᾲᾳᾴᾶᾷᾰᾱὰάἐἑἒἓἔἕὲέἰἱἲἳἴἵἶἷὶίῐῑῒΐῖῗὀὁὂὃὄὅόὸὐὑὒὓὔὕὖὗϋῠῡῢΰῦῧύὺᾐᾑᾒᾓᾔᾕᾖᾗῂῃῄῆῇἤἢἥἣὴήἠἡἦἧὠὡὢὣὤὥὦὧᾠᾡᾢᾣᾤᾥᾦᾧῲῳῴῶῷώὼ]`
+	const notachar = `[^\sa-zα-ωϲῥἀἁἂἃἄἅἆἇᾀᾁᾂᾃᾄᾅᾆᾇᾲᾳᾴᾶᾷᾰᾱὰάἐἑἒἓἔἕὲέἰἱἲἳἴἵἶἷὶίῐῑῒΐῖῗὀὁὂὃὄὅόὸὐὑὒὓὔὕὖὗϋῠῡῢΰῦῧύὺᾐᾑᾒᾓᾔᾕᾖᾗῂῃῄῆῇἤἢἥἣὴήἠἡἦἧὠὡὢὣὤὥὦὧᾠᾡᾢᾣᾤᾥᾦᾧῲῳῴῶῷώὼ]`
 	re := regexp.MustCompile(tagger)
 
 	totalsent := len(ss)
@@ -325,6 +325,7 @@ func HipparchiaVectors() string {
 	previous = time.Now()
 
 	// [J] store...
+
 	kk := strings.Split(key, "_")
 	resultkey := kk[0] + "_vectorresults"
 
