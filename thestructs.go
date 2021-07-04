@@ -86,7 +86,7 @@ type CompositePollingData struct {
 	ID            string // this is not stored in redis; it is asserted here
 }
 
-type TheConfiguration struct {
+type CurrentConfiguration struct {
 	RedisKey    string
 	MaxHits     int64
 	WorkerCount int

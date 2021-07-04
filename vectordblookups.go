@@ -15,7 +15,10 @@ import (
 	"sync"
 )
 
-func fetchdblinesdirectly(thedb string, thestart int, theend int, dbpool *pgxpool.Pool) map[int]DbWorkline {
+func fetchdblinesdirectly(dbpool *pgxpool.Pool) map[int]DbWorkline {
+	thedb := cfg.VectTestDB
+	thestart := cfg.VectStart
+	theend := cfg.VectEnd
 	// No redis key; gathering lines with a direct PostgreSQL query
 	dblines := make(map[int]DbWorkline)
 	foundrows, err := dbpool.Query(context.Background(), fmt.Sprintf(tesquery, thedb, thestart, theend))

@@ -25,7 +25,8 @@ import (
 )
 
 // HipparchiaGolangSearcher : Execute a series of SQL queries stored in redis by dispatching a collection of goroutines
-// the python module calls this; you set up 'cfg' and then hand off to HipparchiaSearcher()
+// the python module calls this; the module needs to be able to set the logging level, etc.
+// and so you set up 'cfg' and then you can call HipparchiaSearcher()
 func HipparchiaGolangSearcher(thekey string, hitcap int64, workercount int, ll int, rl RedisLogin, pl PostgresLogin) string {
 	cfg.RedisKey = thekey
 	cfg.MaxHits = hitcap
@@ -39,9 +40,6 @@ func HipparchiaGolangSearcher(thekey string, hitcap int64, workercount int, ll i
 }
 
 func HipparchiaSearcher() string {
-	// this is the code that the python module version is calling instead of main()
-	// that also means that the module needs to be able to set the logging level
-
 	msg(fmt.Sprintf("Searcher Launched"), 1)
 
 	runtime.GOMAXPROCS(cfg.WorkerCount + 1)
@@ -89,16 +87,8 @@ func grabber(clientnumber int, searchkey string, awaiting *sync.WaitGroup) {
 
 		// [vi] iterate through the finds
 		// don't check-and-load find-by-find because some searches are effectively uncapped
-		// if you search for "y" near "x", during the first search iteration you will see:
-		// 	[debugging] [HGH] grabber #0 reports that the hitcount is 19023 [debugging]
-		// subsequently you will see:
-		//	[debugging] [HGH] grabber #2 reports that the hitcount is 243 [debugging]
-		//	[debugging] [HGH] grabber #0 reports that the hitcount is 244 [debugging]
-		//	[debugging] [HGH] grabber #3 reports that the hitcount is 351 [debugging]
-		//	[debugging] [HGH] grabber #1 reports that the hitcount is 351 [debugging]
-		// and yet only 200 items will come back at you if 200 is your cap
 		// faster to test only after you finish each query
-		// can over-load redis because HipparchaServer should only display hitcap results no matter how many you push
+		// can over-stuff redis because HipparchaServer should only display hitcap results no matter how many you push
 
 		var thesefinds []DbWorkline
 

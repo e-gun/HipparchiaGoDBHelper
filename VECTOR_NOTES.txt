@@ -291,3 +291,6 @@ Showing nodes accounting for 18.87MB, 100% of 18.87MB total
 //  https://segment.com/blog/allocation-efficiency-in-high-performance-go-services/
 //  https://blog.golang.org/pprof
 //  https://software.intel.com/content/www/us/en/develop/blogs/debugging-performance-issues-in-go-programs.html
+
+
+why is "υθμόν" in the vector results for aristotle gr0086?

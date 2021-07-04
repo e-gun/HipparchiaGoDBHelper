@@ -26,7 +26,8 @@ import (
 	"time"
 )
 
-//StartHipparchiaPollWebsocket: fire up our own websocket server because wscheckpoll() in HipparchiaServer is unavailable to golang module users
+// HipparchiaWebsocket : fire up our own websocket server because wscheckpoll() in HipparchiaServer is unavailable to golang users
+// note that HipparchiaServer can't call this as a module at helperappwebsocketserver() without blocking. So there is no interface for that
 func HipparchiaWebsocket() {
 	port := cfg.WSPort
 
