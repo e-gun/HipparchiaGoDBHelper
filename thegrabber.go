@@ -11,7 +11,7 @@
 // [d] it also updates the redis progress poll data relative to this search
 //
 
-package main
+package hipparchiagolangsearching
 
 import (
 	"context"

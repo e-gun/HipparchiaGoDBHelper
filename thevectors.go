@@ -19,7 +19,7 @@
 // once you reach this point python can fetch the bags and then run "Word2Vec(bags, parameters, ...)"
 //
 
-package main
+package hipparchiagolangsearching
 
 import (
 	"encoding/json"

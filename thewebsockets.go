@@ -10,7 +10,7 @@
 //	[d] it parses, packages (as JSON), and then redistributes this information back over the websocket
 //	[e] when the poll disappears from redis, the messages stop broadcasting
 
-package main
+package hipparchiagolangsearching
 
 import (
 	"C"
