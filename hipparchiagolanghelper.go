@@ -80,7 +80,7 @@
 //    	[websockets] save the polls instead of deleting them: 0 is no; 1 is yes
 
 // toggle the package name to shift between cli and module builds: main or hipparchiagolangsearching
-package hipparchiagolangsearching
+package main
 
 import (
 	"C"

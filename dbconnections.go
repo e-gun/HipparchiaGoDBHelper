@@ -1,4 +1,4 @@
-package hipparchiagolangsearching
+package main
 
 import (
 	"context"
