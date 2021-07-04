@@ -153,6 +153,7 @@ func HipparchiaVectors() string {
 
 	// this would be a good place to deabbreviate, etc...
 	thetext = makesubstitutions(thetext)
+	thetext = acuteforgrave(thetext)
 
 	m = fmt.Sprintf("Preliminary cleanups complete")
 	rcsetstr(rc, smk, m)

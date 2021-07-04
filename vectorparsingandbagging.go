@@ -25,7 +25,7 @@ func stripper(item string, purge []string) string {
 	return item
 }
 
-func makesubstitutions(text string) string {
+func makesubstitutions(thetext string) string {
 	// https://golang.org/pkg/strings/#NewReplacer
 	// cf cleanvectortext() in vectorhelpers.py
 	swap := strings.NewReplacer("v", "u", "j", "i", "σ", "ϲ", "ς", "ϲ", "A.", "Aulus", "App.", "Appius",
@@ -37,23 +37,30 @@ func makesubstitutions(text string) string {
 		"Quint.", "Quintilis", "Sext.", "Sextilis", "Sept.", "Septembris", "Oct.", "Octobris", "Nov.", "Novembris",
 		"Dec.", "Decembris")
 
-	return swap.Replace(text)
+	return swap.Replace(thetext)
 }
 
-func splitonpunctuaton(text string) []string {
+func splitonpunctuaton(thetext string) []string {
 	// replacement for recursivesplitter(): perhaps very slightly faster, but definitely much more direct and legible
 	// swap all punctuation for one item; then split on it...
 	swap := strings.NewReplacer("?", ".", "!", ".", "·", ".", ";", ".")
-	text = swap.Replace(text)
-	split := strings.Split(text, ".")
+	thetext = swap.Replace(thetext)
+	split := strings.Split(thetext, ".")
 
 	// slower way of doing the same...
 
 	//re := regexp.MustCompile("[?!;·]")
-	//text = re.ReplaceAllString(text, ".")
-	//split := strings.Split(text, ".")
+	//thetext = re.ReplaceAllString(thetext, ".")
+	//split := strings.Split(thetext, ".")
 
 	return split
+}
+
+func acuteforgrave(thetext string) string {
+	swap := strings.NewReplacer("ὰ", "ά", "ὲ", "έ", "ὶ", "ί", "ὸ", "ό", "ὺ", "ύ", "ὴ", "ή", "ὼ", "ώ",
+		"ἂ", "ἄ", "ἒ", "ἔ", "ἲ", "ἴ", "ὂ", "ὄ", "ὒ", "ὔ", "ἢ", "ἤ", "ὢ", "ὤ", "ᾃ", "ᾅ", "ᾓ", "ᾕ", "ᾣ", "ᾥ",
+		"ᾂ", "ᾄ", "ᾒ", "ᾔ", "ᾢ", "ᾤ")
+	return swap.Replace(thetext)
 }
 
 func dropstopwords(skipper string, bagsofwords []BagWithLocus) []BagWithLocus {
