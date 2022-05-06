@@ -87,7 +87,10 @@ func rcpopstr(c redis.Conn, k string) string {
 
 func grabpgsqlconnection() *pgxpool.Pool {
 	pl := cfg.PGLogin
-	workers := cfg.WorkerCount
+
+	// using 'workers' was causing an m1 to choke when the worker count got high: no available connections to db
+	// panic: failed to connect to `host=localhost user=hippa_wr database=hipparchiaDB`: server error (FATAL: remaining connection slots are reserved for non-replication superuser connections (SQLSTATE 53300))
+	// workers := cfg.WorkerCount
 
 	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", pl.User, pl.Pass, pl.Host, pl.Port, pl.DBName)
 
@@ -97,9 +100,9 @@ func grabpgsqlconnection() *pgxpool.Pool {
 		panic(oops)
 	}
 
-	config.ConnConfig.PreferSimpleProtocol = true
-	config.MaxConns = int32((workers) * 2)
-	config.MinConns = int32(workers)
+	// config.ConnConfig.PreferSimpleProtocol = true
+	// config.MaxConns = int32(workers * 3)
+	// config.MinConns = int32(workers + 2)
 
 	// the boring way if you don't want to go via pgxpool.ParseConfig(url)
 	// pooledconnection, err := pgxpool.Connect(context.Background(), url)
